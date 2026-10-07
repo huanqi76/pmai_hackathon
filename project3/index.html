@@ -1,0 +1,1010 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Surge Triage Console (Copy)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a dispatch console. Control bar, a strip of surge metrics, then the dispatcher queue (left) beside the district map, incidents and the add-a-call form (right). One column under 980px. */
+:root{
+  --bg:#E7EBEF; --panel:#FFFFFF; --panel-2:#F2F4F7; --ink:#13202D; --muted:#566576; --faint:#8794A3; --line:#D2D9E1;
+  --accent:#1B5CA6; --accent-soft:rgba(27,92,166,.10); --on-accent:#FFFFFF;
+  --p1:#BD282E; --p1-soft:rgba(189,40,46,.10);
+  --p2:#A35F0A; --p2-soft:rgba(163,95,10,.12);
+  --p3:#4C6884; --p3-soft:rgba(76,104,132,.12);
+  --dup:#76828F; --dup-soft:rgba(118,130,143,.12);
+  --ok:#1D7348; --ok-soft:rgba(29,115,72,.11);
+  --c0:#1B5CA6; --c1:#0D7770; --c2:#6A4DB2; --c3:#86670F; --c4:#A23B79; --c5:#3B772C;
+  --map-street:#F8F9FB; --map-block:#DFE5EB; --map-water:#C3D8E9; --map-hwy:#E8DBBA; --map-bldg:#C4CDD7; --map-label:#66748A;
+  --shadow:0 1px 2px rgba(19,32,45,.06),0 2px 10px rgba(19,32,45,.05);
+  --font-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D131A; --panel:#151D26; --panel-2:#1B2530; --ink:#E3E9EF; --muted:#9BA9B8; --faint:#6E7D8D; --line:#283440;
+    --accent:#6DA5EB; --accent-soft:rgba(109,165,235,.15); --on-accent:#0D131A;
+    --p1:#FF6E6E; --p1-soft:rgba(255,110,110,.15); --p2:#EFA54C; --p2-soft:rgba(239,165,76,.15);
+    --p3:#8EAED0; --p3-soft:rgba(142,174,208,.15); --dup:#8592A0; --dup-soft:rgba(133,146,160,.15); --ok:#5CC98E; --ok-soft:rgba(92,201,142,.14);
+    --c0:#6DA5EB; --c1:#4DC0B4; --c2:#A68DEB; --c3:#D3AF4D; --c4:#E07CB7; --c5:#7CC469;
+    --map-street:#1F2933; --map-block:#131B23; --map-water:#14304A; --map-hwy:#3A3424; --map-bldg:#2B3947; --map-label:#8A99A9;
+    --shadow:0 1px 2px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D131A; --panel:#151D26; --panel-2:#1B2530; --ink:#E3E9EF; --muted:#9BA9B8; --faint:#6E7D8D; --line:#283440;
+  --accent:#6DA5EB; --accent-soft:rgba(109,165,235,.15); --on-accent:#0D131A;
+  --p1:#FF6E6E; --p1-soft:rgba(255,110,110,.15); --p2:#EFA54C; --p2-soft:rgba(239,165,76,.15);
+  --p3:#8EAED0; --p3-soft:rgba(142,174,208,.15); --dup:#8592A0; --dup-soft:rgba(133,146,160,.15); --ok:#5CC98E; --ok-soft:rgba(92,201,142,.14);
+  --c0:#6DA5EB; --c1:#4DC0B4; --c2:#A68DEB; --c3:#D3AF4D; --c4:#E07CB7; --c5:#7CC469;
+  --map-street:#1F2933; --map-block:#131B23; --map-water:#14304A; --map-hwy:#3A3424; --map-bldg:#2B3947; --map-label:#8A99A9;
+  --shadow:0 1px 2px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--font-body)}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{max-width:1440px;margin:0 auto;padding-inline:16px;padding-block:14px 40px;display:grid;gap:14px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+/* Control bar */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
+.brand{display:grid;gap:2px;min-width:0}
+.brand h1{margin:0;font:700 22px/1.1 var(--font-display);letter-spacing:.02em;text-transform:uppercase}
+.brand p{margin:0;color:var(--muted);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;font-size:13px;line-height:1.2}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn:focus-visible,.seg button:focus-visible,.call:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.inc-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{appearance:none;border:0;background:transparent;padding:7px 10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.clock{display:grid;justify-items:end;line-height:1.1}
+.clock b{font:500 20px/1.1 var(--font-mono);font-variant-numeric:tabular-nums}
+.clock span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* Flow strip: the whole system in one line */
+.flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr);background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.step{padding:12px 16px;display:grid;gap:2px;align-content:start;min-width:0;position:relative}
+.step .n{position:absolute;top:10px;right:12px;font:600 11px/1 var(--font-mono);color:var(--faint)}
+.step .q{font-size:12px;line-height:1.35;color:var(--faint);font-style:italic;margin-top:4px}
+.step.p1{border-left:1px solid var(--line);background:var(--p1-soft)}
+.step.p1 .n{color:var(--p1)}
+.step .v{font:500 30px/1.05 var(--font-mono);font-variant-numeric:tabular-nums}
+.step .k{font-size:12.5px;line-height:1.3;color:var(--muted)}
+.step.p1 .v{color:var(--p1)}
+.step.wait{border-left:1px solid var(--line);background:var(--panel-2)}
+.step.wait .v{font-size:24px}
+.step.wait .v .arrow{color:var(--faint);font-size:16px;padding-inline:5px}
+.step.wait .v .after{color:var(--accent)}
+.arr{align-self:center;color:var(--faint);font-size:22px;line-height:1}
+
+/* Main grid */
+.main{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:14px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0;font:600 15px/1.2 var(--font-display);text-transform:uppercase;letter-spacing:.06em}
+.panel-head .hint{font-size:12px;color:var(--muted)}
+.side{display:grid;gap:14px;min-width:0}
+
+/* Queue */
+.queue-wrap{padding:10px 12px 14px;display:grid;gap:8px}
+.view-note{font-size:12.5px;color:var(--muted);margin:2px 2px 4px;max-width:70ch}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px 3px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.filter-chip button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:12px;text-decoration:underline;padding:0 4px}
+.group-h{display:flex;align-items:baseline;gap:8px;margin:8px 2px 0;font:600 12px/1.2 var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.group-h .n{font-family:var(--font-mono);font-weight:500}
+.group-h .rule{flex:1;height:1px;background:var(--line);align-self:center}
+.empty{padding:28px 12px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+
+.call{--sev:var(--dup);display:grid;grid-template-columns:40px minmax(0,1fr);background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--sev);border-radius:8px;cursor:pointer;text-align:left}
+.call.p1{--sev:var(--p1)} .call.p2{--sev:var(--p2)} .call.p3{--sev:var(--p3)} .call.dup{--sev:var(--dup)}
+.call.p1{background:linear-gradient(90deg,var(--p1-soft),transparent 55%) var(--panel)}
+.call:hover{border-color:var(--faint);border-left-color:var(--sev)}
+.call.sel{box-shadow:0 0 0 2px var(--accent-soft);border-color:var(--accent);border-left-color:var(--sev)}
+.call .pos{font:500 12px/1 var(--font-mono);color:var(--muted);padding:13px 0 0 8px}
+.call .body{padding:9px 12px 10px 4px;display:grid;gap:6px;min-width:0}
+.call .top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}
+.pill{display:inline-flex;align-items:center;font:600 11px/1 var(--font-display);text-transform:uppercase;letter-spacing:.07em;padding:4px 7px;border-radius:4px;background:var(--sev-soft,var(--dup-soft));color:var(--sev-c,var(--dup))}
+.pill.p1{--sev-soft:var(--p1-soft);--sev-c:var(--p1)} .pill.p2{--sev-soft:var(--p2-soft);--sev-c:var(--p2)} .pill.p3{--sev-soft:var(--p3-soft);--sev-c:var(--p3)}
+.score{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink);min-width:2.2ch}
+.inc-tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);min-width:0}
+.inc-tag i{width:8px;height:8px;border-radius:50%;background:var(--ic);flex:none}
+.inc-tag b{font-weight:600;color:var(--ink);font-family:var(--font-mono);font-size:11.5px}
+.meta{margin-left:auto;font:400 11.5px/1.2 var(--font-mono);color:var(--muted);white-space:nowrap}
+.tx{margin:0;color:var(--ink);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-width:72ch}
+.dup-group{border:1px dashed var(--line);border-radius:8px;background:var(--panel)}
+.dup-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;width:100%;padding:10px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:13px;color:var(--muted);border-radius:8px}
+.dup-head:hover{background:var(--panel-2)}
+.dup-head:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dup-head .more{margin-left:auto;color:var(--accent);font-size:12.5px;font-weight:500}
+.dup-list{display:grid;gap:6px;padding:0 8px 8px}
+.verdict-line{margin:0 0 6px;font-size:13px}
+.checks{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:3px;font-size:12.5px}
+.ck{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:baseline}
+.ck .mark{font-weight:700;font-family:var(--font-mono)}
+.ck.yes .mark{color:var(--ok)} .ck.no .mark{color:var(--p1)} .ck.maybe .mark{color:var(--faint)}
+.ck b{font-weight:600;margin-right:4px}
+.dialog{margin:10px 0 0;padding:8px 10px;border-radius:6px;background:var(--panel-2);display:grid;gap:4px;font-size:12.5px}
+.dialog p{margin:0;display:grid;grid-template-columns:58px minmax(0,1fr)}
+.dialog .who{font:600 11px/1.6 var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.outcome{margin:8px 0 0;font-size:13px}
+.chip.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.group-h.p1{color:var(--p1)} .group-h.ok{color:var(--ok)}
+.where-line{margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.tx.silent{color:var(--muted);font-style:italic}
+.call.open .tx{-webkit-line-clamp:unset;display:block}
+.reasons{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11.5px;line-height:1.2;padding:3px 7px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink)}
+.chip b{font-family:var(--font-mono);font-weight:500;margin-right:4px}
+.chip.threat{background:var(--p1-soft);border-color:transparent;color:var(--p1)}
+.chip.minus{color:var(--muted)}
+.call.dup .body{gap:3px;padding-block:7px}
+.call.dup .tx{-webkit-line-clamp:1;color:var(--muted);font-size:13px}
+.call.dup .pos{padding-top:10px}
+
+.detail{display:grid;gap:12px;border-top:1px solid var(--line);margin-top:4px;padding-top:10px;cursor:default}
+.d-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px 20px}
+@media (max-width:640px){.d-grid{grid-template-columns:minmax(0,1fr)}}
+.detail h4{margin:0 0 6px;font:600 11px/1.2 var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.bk{width:100%;border-collapse:collapse;font-size:12.5px}
+.bk td{padding:3px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.bk td:last-child{text-align:right;font-family:var(--font-mono);padding-left:10px;white-space:nowrap}
+.bk tr.total td{border-bottom:0;font-weight:600}
+.kv{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font-size:12.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.match{display:grid;gap:6px;font-size:12.5px}
+.match .row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;align-items:center}
+.bar-mini{height:6px;border-radius:3px;background:var(--panel-2);position:relative;overflow:hidden;border:1px solid var(--line)}
+.bar-mini span{position:absolute;inset:0 auto 0 0;background:var(--ic,var(--accent))}
+.bar-mini .th{position:absolute;top:-2px;bottom:-2px;width:2px;left:70%;background:var(--ink);opacity:.55}
+.match .parts{grid-column:1/-1;color:var(--muted);font-size:11.5px}
+.match .verdict{font-family:var(--font-mono);font-size:12px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.actions select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 8px;font-size:13px}
+.actions .note{font-size:12px;color:var(--muted)}
+
+/* Map */
+.map-box{padding:10px 12px 12px;display:grid;gap:8px}
+.map-svg{width:100%;height:auto;display:block;border-radius:6px;cursor:crosshair;touch-action:manipulation}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.m-street{fill:var(--map-street)} .m-block{fill:var(--map-block)} .m-water{fill:var(--map-water)} .m-hwy{fill:var(--map-hwy)}
+.m-bldg{fill:var(--map-bldg)} .m-bridge{fill:var(--map-street);stroke:var(--map-label);stroke-width:2}
+.m-label{fill:var(--map-label);font:600 25px var(--font-display);letter-spacing:.06em;text-transform:uppercase}
+.m-place{fill:var(--map-label);font:600 21px var(--font-display)}
+.m-acc{fill:var(--ic);fill-opacity:.07;stroke:var(--ic);stroke-opacity:.45;stroke-width:2;stroke-dasharray:6 6}
+.m-link{stroke:var(--ic);stroke-width:3;stroke-dasharray:4 9;stroke-linecap:round;opacity:.8;fill:none}
+.m-phone{fill:var(--ic);stroke:var(--panel);stroke-width:4}
+.m-phone.silent{fill:var(--panel);stroke:var(--ic);stroke-width:5}
+.m-phone.hot{stroke:var(--ink);stroke-width:6}
+.m-inc{fill:var(--ic);fill-opacity:.14;stroke:var(--ic);stroke-width:4;cursor:pointer}
+.m-inc-ring{fill:none;stroke:var(--p1);stroke-width:5;stroke-dasharray:14 10}
+.m-tag-bg{fill:var(--panel);stroke:var(--ic);stroke-width:3}
+.m-tag{fill:var(--ink);font:600 26px var(--font-mono)}
+.m-cc{fill:none;stroke:var(--accent);stroke-width:5}
+.m-cc-dot{fill:var(--accent)}
+.g-inc{cursor:pointer}
+.g-inc.dim{opacity:.3}
+
+/* Incidents */
+.inc-list{display:grid;padding:4px 0}
+.inc-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--line);background:transparent;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
+.inc-row:last-child{border-bottom:0}
+.inc-row:hover{background:var(--panel-2)}
+.inc-row.on{background:var(--accent-soft)}
+.inc-row i{width:10px;height:10px;border-radius:50%;background:var(--ic)}
+.inc-row .name{font-weight:600;min-width:0}
+.inc-row .name small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.inc-row .cnt{font:500 12px/1.3 var(--font-mono);color:var(--muted);text-align:right;white-space:nowrap}
+
+/* Add a call */
+.form{padding:12px 14px 14px;display:grid;gap:10px}
+.form label{font-size:12px;color:var(--muted);display:grid;gap:4px}
+.form textarea{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 10px;min-height:76px;resize:vertical;width:100%}
+.form input,.form select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 9px;width:100%}
+.form .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets .btn{font-size:12px;padding:5px 9px}
+.where{font-size:12.5px;color:var(--muted)}
+.where b{color:var(--ink);font-weight:500}
+details.how{padding:0}
+details.how summary{cursor:pointer;padding:12px 14px;font:600 15px/1.2 var(--font-display);text-transform:uppercase;letter-spacing:.06em;list-style:none}
+details.how summary::-webkit-details-marker{display:none}
+details.how summary::after{content:"Show";float:right;font:500 12px var(--font-body);text-transform:none;letter-spacing:0;color:var(--accent)}
+details.how[open] summary::after{content:"Hide"}
+.how-body{padding:0 14px 14px;display:grid;gap:8px;font-size:13px}
+.how-body table{border-collapse:collapse;width:100%;font-size:12.5px}
+.how-body td{padding:4px 0;border-bottom:1px solid var(--line)}
+.how-body td:last-child{text-align:right;font-family:var(--font-mono);white-space:nowrap;padding-left:10px}
+.how-body p{margin:0;color:var(--muted);max-width:70ch}
+
+@keyframes arrive{from{box-shadow:0 0 0 3px var(--accent)}to{box-shadow:0 0 0 0 transparent}}
+.call.new{animation:arrive 1.6s ease-out}
+@media (prefers-reduced-motion: reduce){.call.new{animation:none}}
+
+@media (max-width:980px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .flow{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .flow .arr{display:none}
+  .step.wait{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
+}
+@media (max-width:560px){
+  .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form .row{grid-template-columns:minmax(0,1fr)}
+  .clock{justify-items:start}
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <h1>Surge Triage Console</h1>
+       </div>
+    <div class="controls">
+      <button class="btn primary" id="btn-replay" type="button">Replay surge</button>
+      <button class="btn" id="btn-play" type="button">Play</button>
+      <button class="btn" id="btn-end" type="button">Skip to end</button>
+      <div class="seg" role="group" aria-label="Playback speed">
+        <button type="button" data-speed="1" aria-pressed="false">1×</button>
+        <button type="button" data-speed="4" aria-pressed="true">4×</button>
+        <button type="button" data-speed="10" aria-pressed="false">10×</button>
+      </div>
+      <div class="clock"><b id="clock">21:04:00</b><span id="clock-sub">Scenario clock</span></div>
+    </div>
+  </header>
+
+  <section class="flow" aria-label="How waiting callers are sorted before a call-taker picks up">
+    <div class="step"><span class="n">1</span><span class="v" id="m-calls">0</span><span class="k">callers waiting in line speak first</span><span class="q">“Tell us what's happening and where.”</span></div>
+    <span class="arr" aria-hidden="true">→</span>
+    <div class="step"><span class="n">2</span><span class="v" id="m-match">0</span><span class="k">match one of <span id="m-inc">0</span> known incidents</span><span class="q">same place, type, words and time</span></div>
+    <span class="arr" aria-hidden="true">→</span>
+    <div class="step"><span class="n">3</span><span class="v" id="m-dup">0</span><span class="k">confirm it's the same, nothing new</span><span class="q">“Are you calling about the fire at Harbor Cold Storage?”</span></div>
+    <div class="step p1"><span class="n">!</span><span class="v" id="m-p1">0</span><span class="k">life-threatening, picked up first</span><span class="q">danger words or new information</span></div>
+    <div class="step wait"><span class="v" id="m-wait">–</span><span class="k">callers ahead of each life-threatening call, first-come vs. triaged</span></div>
+  </section>
+
+  <div class="main">
+    <section class="panel" aria-label="Dispatcher queue">
+      <div class="panel-head">
+        <h2>Waiting line</h2>
+        <div class="seg" role="group" aria-label="Line order">
+          <button type="button" data-view="triaged" aria-pressed="true">Triaged</button>
+          <button type="button" data-view="arrival" aria-pressed="false">First-come</button>
+        </div>
+      </div>
+      <div class="queue-wrap">
+        <div id="filter-slot"></div>
+        <div class="queue" id="queue"></div>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="panel" aria-label="District map">
+        <div class="panel-head"><h2>Map</h2><span class="hint">Click an incident to filter the line</span></div>
+        <div class="map-box">
+          <svg class="map-svg" id="map" viewBox="0 0 1600 1000" role="img" aria-label="Map of the Harbor District with incidents and caller locations"></svg>
+          <div class="legend">
+            <span><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4" style="fill:var(--c0)"/></svg>Caller's phone</span>
+            <span><svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true"><line x1="1" y1="5" x2="21" y2="5" style="stroke:var(--c0);stroke-width:2;stroke-dasharray:2 3"/></svg>Points to the spot they describe</span>
+            <span><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" style="fill:none;stroke:var(--p1);stroke-width:2;stroke-dasharray:3 2"/></svg>Has an Immediate call</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Incidents">
+        <div class="panel-head"><h2>Incidents</h2></div>
+        <div class="inc-list" id="inc-list"></div>
+      </section>
+
+      <details class="panel how" id="cc-panel">
+        <summary>Add a call</summary>
+        <form class="form" id="cc-form">
+          <div class="presets" aria-label="Example calls">
+            <button class="btn" type="button" data-preset="0">Unconscious man, new place</button>
+            <button class="btn" type="button" data-preset="1">Another fire caller</button>
+            <button class="btn" type="button" data-preset="2">Silent line</button>
+          </div>
+          <label for="cc-text">Transcript
+            <textarea id="cc-text" placeholder="What the caller says, for example: There's smoke coming out of a house on Front Street."></textarea>
+          </label>
+          <div class="row">
+            <label for="cc-ani">Caller's number
+              <input id="cc-ani" class="mono" value="(718) 555-0101">
+            </label>
+            <label for="cc-acc">Phone location accuracy
+              <select id="cc-acc">
+                <option value="10">±10 m (device GPS)</option>
+                <option value="50" selected>±50 m</option>
+                <option value="150">±150 m (cell tower)</option>
+              </select>
+            </label>
+          </div>
+          <p class="where" id="cc-where"></p>
+          <div class="actions">
+            <button class="btn primary" type="submit">Add call to queue</button>
+            <span class="note" id="cc-note"></span>
+          </div>
+        </form>
+      </details>
+
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- District geography (meters, origin top-left) ---------- */
+const STREETS = {
+  h: [
+    { name: 'Water St',  y: 160, keys: ['water street', 'water st'] },
+    { name: 'Dock St',   y: 300, keys: ['dock street', 'dock st', 'dock'] },
+    { name: 'Front St',  y: 440, keys: ['front street', 'front st'] },
+    { name: 'Elm St',    y: 580, keys: ['elm street', 'elm st', 'elm'] },
+    { name: 'Bridge Rd', y: 760, keys: ['bridge road', 'bridge rd'] },
+    { name: 'Oak Ave',   y: 900, keys: ['oak avenue', 'oak ave', 'oak'] }
+  ],
+  v: [
+    { name: 'Pier Ave', x: 360,  keys: ['pier avenue', 'pier ave', 'pier'] },
+    { name: '1st Ave',  x: 620,  keys: ['1st avenue', '1st ave', 'first avenue', 'first ave'] },
+    { name: '2nd Ave',  x: 880,  keys: ['2nd avenue', '2nd ave', 'second avenue', 'second ave'] },
+    { name: '3rd Ave',  x: 1140, keys: ['3rd avenue', '3rd ave', 'third avenue', 'third ave'] },
+    { name: '4th Ave',  x: 1400, keys: ['4th avenue', '4th ave', 'fourth avenue', 'fourth ave'] }
+  ]
+};
+const PLACES = [
+  { id: 'warehouse', name: 'Harbor Cold Storage, 200 Dock St', short: 'Cold Storage', kind: 'building', x: 462, y: 235, keys: ['harbor cold storage', 'cold storage', 'warehouse', '200 dock'] },
+  { id: 'lofts', name: 'Dockside Lofts, 230 Dock St', short: 'Lofts', kind: 'building', x: 564, y: 235, keys: ['dockside lofts', 'the lofts', 'apartment building next door', 'apartments next door'] },
+  { id: 'elm412', name: '412 Elm St', short: '412 Elm', kind: 'building', x: 780, y: 545, keys: ['412 elm'] },
+  { id: 'school', name: 'Harbor School, 4th Ave & Oak Ave', short: 'School', kind: 'building', x: 1490, y: 955, keys: ['harbor school', 'the school', 'school'] },
+  { id: 'bridge', name: 'Harbor Bridge', short: 'Harbor Bridge', kind: 'landmark', x: 92, y: 760, keys: ['harbor bridge', 'the bridge', 'bridge'] }
+];
+
+/* ---------- Language rules ---------- */
+const TYPES = {
+  fire:     { label: 'Structure fire', say: 'the fire', words: ['fire', 'flames', 'smoke', 'burning', 'firefighter', 'firefighters', 'fire truck'] },
+  crash:    { label: 'Vehicle crash', say: 'the crash', words: ['crash', 'crashed', 'accident', 'collision', 'car', 'cars', 'pinned', 'hit'] },
+  medical:  { label: 'Medical', say: 'the medical emergency', words: ['collapsed', 'not breathing', "isn't breathing", 'unconscious', 'heart attack', 'chest pain', 'seizure', 'overdose', 'compressions', 'breathing'] },
+  gas:      { label: 'Gas leak', say: 'the gas leak', words: ['gas smell', 'smell gas', 'gas leak', 'gas'] },
+  violence: { label: 'Weapon or assault', say: 'the assault', words: ['gun', 'shot', 'shooting', 'stabbed', 'knife', 'fight'] }
+};
+const THREATS = ['not breathing', "isn't breathing", "can't breathe", 'stopped breathing', 'unconscious', 'not moving', 'collapsed',
+  'trapped', 'stuck', "can't get out", "can't get down", 'pinned', 'bleeding a lot', 'bleeding', 'spreading',
+  'gun', 'shot', 'stabbed', 'overdose', 'drowning'];
+const VICTIM_RES = [
+  /\b(i'm|i am|we're|we are)\b[^.!?]{0,40}?\b(trapped|stuck|inside|hurt|bleeding|pinned|in one of the cars|in the car|on the (?:\w+ )?floor)\b/,
+  /\bi can't (get|breathe|move)\b/
+];
+const VULN_RE = /\b(kid|kids|child|children|baby|toddler|infant|elderly|pregnant|school|daycare|nursing home)\b/;
+const STOP = new Set(("a an the and or but is are was were be been it its i im we were you your he hes she they theyre there theres this that these those of on in at to from for with by near over up out down off into about just really very all some any can cant get got do does did have has had not no yes yeah okay ok hi hey please my our his her their them me us so too now already like one two lot lots what who where when how which think know guys need needs come street avenue ave road").split(' '));
+
+/* ---------- Simulated calls (fictional district, fictional 555-01xx numbers) ---------- */
+const SCRIPT = [
+  { t: 0,   ani: '0142', x: 430,  y: 330, acc: 15, text: "There's a fire at the warehouse on Dock Street, the big cold storage one. Smoke is pouring out of the roof." },
+  { t: 14,  ani: '0117', x: 214,  y: 420, acc: 60, text: "I'm on the Shore Expressway and I can see huge flames from a warehouse by the water, near Dock Street." },
+  { t: 22,  ani: '0163', x: 520,  y: 120, acc: 20, text: "Yeah, the cold storage building on Dock is on fire. Black smoke everywhere." },
+  { t: 31,  ani: '0188', x: 572,  y: 238, acc: 8,  text: "Please, I'm on the third floor of Dockside Lofts next to the warehouse. Smoke is coming in under the door and I can't get down the stairs!" },
+  { t: 40,  ani: '0142', x: 430,  y: 330, acc: 15, text: "I called a minute ago. The fire is spreading to the apartment building next door now, the roof is catching." },
+  { t: 47,  ani: '0129', x: 900,  y: 300, acc: 35, text: "Fire on Dock Street, do you guys know about it?" },
+  { t: 55,  ani: '0151', x: 784,  y: 538, acc: 10, text: "Hi. My father just collapsed in the kitchen. He's not breathing. We're at 412 Elm Street, apartment 2." },
+  { t: 63,  ani: '0104', x: 300,  y: 160, acc: 25, text: "There's a ton of smoke coming from Dock Street. Is everyone okay?" },
+  { t: 70,  ani: '0172', x: 150,  y: 768, acc: 40, text: "There's been a crash on the Harbor Bridge, two cars. I think people were slowing down to look at the fire." },
+  { t: 78,  ani: '0110', x: 640,  y: 140, acc: 18, text: "OH MY GOD the whole warehouse is on fire!!! Hurry please!!!", stay: true },
+  { t: 84,  ani: '0195', x: 108,  y: 752, acc: 12, text: "I'm in one of the cars on the bridge. The other driver's leg is pinned and he's bleeding a lot." },
+  { t: 92,  ani: '0137', x: 470,  y: 360, acc: 10, text: "The fire at Harbor Cold Storage, flames are coming out of the windows on the Dock Street side." },
+  { t: 99,  ani: '0188', x: 572,  y: 238, acc: 8, silent: true, text: "[Open line. No speech. Coughing and a smoke alarm in the background.]" },
+  { t: 106, ani: '0121', x: 1200, y: 620, acc: 50, text: "I can smell smoke all the way over on 3rd Avenue. Is that from the warehouse fire?" },
+  { t: 113, ani: '0146', x: 190,  y: 700, acc: 45, text: "Accident on the bridge, traffic's backed up and cars are stopped." },
+  { t: 121, ani: '0158', x: 400,  y: 200, acc: 15, text: "The warehouse on Dock Street is burning, flames everywhere." },
+  { t: 128, ani: '0183', x: 560,  y: 312, acc: 10, text: "I'm outside the Dockside Lofts. There's a woman and a little kid stuck at a third floor window with smoke behind them, they're waving for help!" },
+  { t: 135, ani: '0166', x: 330,  y: 300, acc: 20, text: "Huge fire at the cold storage place on Dock, the smoke is really bad." },
+  { t: 142, ani: '0179', x: 1000, y: 250, acc: 30, text: "Fire on Dock Street near Pier Avenue, lots of smoke." },
+  { t: 150, ani: '0133', x: 130,  y: 772, acc: 20, text: "On the bridge, the car crash. Someone needs to come, a guy is hurt.", stay: true },
+  { t: 158, ani: '0125', x: 1420, y: 880, acc: 20, text: "There's a really strong gas smell at 4th Avenue and Oak, right near the school." },
+  { t: 166, ani: '0141', x: 450,  y: 180, acc: 12, text: "The warehouse is on fire on Dock Street. I already see a fire truck." },
+  { t: 174, ani: '0168', x: 240,  y: 300, acc: 40, text: "Smoke over Dock Street, big fire." },
+  { t: 182, ani: '0198', x: 500,  y: 290, acc: 10, text: "A firefighter just went down on the Dock Street side. He's not moving, I think part of the wall fell!" }
+].map((c, i) => ({ ...c, id: 'c' + String(i + 1).padStart(2, '0') }));
+const LAST_T = SCRIPT[SCRIPT.length - 1].t;
+
+const PRESETS = [
+  { text: "There's a man lying on the sidewalk at Front Street and 2nd Avenue. He's unconscious and I don't think he's breathing.", x: 900, y: 452, acc: '10' },
+  { text: "I'm across the street from the cold storage warehouse on Dock. Smoke is everywhere and the fire trucks are here.", x: 470, y: 322, acc: '50' },
+  { text: "[Open line. No speech. Muffled voices in the background.]", x: 1260, y: 340, acc: '150', silent: true }
+];
+
+const MATCH_THRESHOLD = 0.70;
+/* How far apart (meters, beyond location uncertainty) two reports of one emergency can be. A fire spreads; a medical call is one patient at one address. */
+const SPAN = { fire: 400, gas: 300, crash: 250, violence: 150, medical: 80 };
+const START_CLOCK = 21 * 3600 + 4 * 60;
+const INC_COLORS = ['--c0', '--c1', '--c2', '--c3', '--c4', '--c5'];
+
+/* ---------- Helpers ---------- */
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const norm = s => s.toLowerCase().replace(/[‘’]/g, "'");
+function findWord(text, phrase) {
+  const m = new RegExp("(^|[^a-z0-9'])(" + reEsc(phrase) + ")(?=$|[^a-z0-9])").exec(text);
+  return m ? m.index + m[1].length : -1;
+}
+const hasWord = (text, phrase) => findWord(text, phrase) >= 0;
+function fmtClock(s) {
+  s = Math.max(0, Math.floor(s));
+  return [Math.floor(s / 3600) % 24, Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':');
+}
+function fmtDur(s) {
+  s = Math.round(s);
+  if (s < 60) return s + 's';
+  return Math.floor(s / 60) + 'm ' + String(s % 60).padStart(2, '0') + 's';
+}
+const phone = ani => ani.startsWith('(') ? ani : '(718) 555-' + ani;
+function tokenize(s) {
+  const out = new Set();
+  for (let w of s.replace(/[^a-z0-9' ]/g, ' ').split(/\s+/)) {
+    w = w.replace(/'s$/, '').replace(/'/g, '');
+    if (w.length < 3 || STOP.has(w)) continue;
+    if (w.length > 4 && w.endsWith('s') && !w.endsWith('ss')) w = w.slice(0, -1);
+    out.add(w);
+  }
+  return out;
+}
+
+/* ---------- Step 2: pull out facts ---------- */
+function locate(speech, call) {
+  let hit = null, pos = Infinity;
+  for (const p of PLACES) for (const k of p.keys) {
+    const i = findWord(speech, k);
+    if (i >= 0 && i < pos) { pos = i; hit = p; }
+  }
+  if (hit) return { x: hit.x, y: hit.y, u: 40, kind: hit.kind, label: hit.name, placeId: hit.id };
+  const hs = STREETS.h.filter(s => s.keys.some(k => hasWord(speech, k)));
+  const vs = STREETS.v.filter(s => s.keys.some(k => hasWord(speech, k)));
+  if (hs.length && vs.length) return { x: vs[0].x, y: hs[0].y, u: 60, kind: 'intersection', label: hs[0].name + ' & ' + vs[0].name };
+  if (hs.length) return { x: clamp(call.x, 210, 1600), y: hs[0].y, u: 400, kind: 'street', label: hs[0].name + ', block not given' };
+  if (vs.length) return { x: vs[0].x, y: clamp(call.y, 0, 1000), u: 400, kind: 'street', label: vs[0].name + ', block not given' };
+  return { x: call.x, y: call.y, u: Math.max(call.acc, 25), kind: 'phone', label: 'Not stated, using phone location' };
+}
+function distressOf(raw) {
+  let d = 0;
+  const bangs = (raw.match(/!/g) || []).length;
+  if (bangs >= 1) d++;
+  if (bangs >= 3) d++;
+  const caps = (raw.match(/\b[A-Z]{2,}\b/g) || []).length;
+  if (caps >= 2) d++;
+  const low = norm(raw);
+  if (/\b(please|hurry|oh my god|help me)\b/.test(low)) d++;
+  if ((low.match(/\b(please|hurry)\b/g) || []).length >= 2) d++;
+  return Math.min(5, d);
+}
+function extract(call) {
+  const raw = call.text || '';
+  const silent = !!call.silent || /^\s*\[/.test(raw);
+  const speech = silent ? '' : norm(raw.replace(/\[[^\]]*\]/g, ' '));
+  let type = null, bestN = 0;
+  for (const [k, def] of Object.entries(TYPES)) {
+    let n = 0;
+    for (const w of def.words) if (hasWord(speech, w)) n++;
+    if (n > bestN) { bestN = n; type = k; }
+  }
+  let threats = THREATS.filter(p => hasWord(speech, p));
+  threats = threats.filter(p => !threats.some(q => q !== p && q.includes(p)));
+  const vm = speech.match(VULN_RE);
+  return {
+    silent, speech, type, threats,
+    victim: !silent && VICTIM_RES.some(re => re.test(speech)),
+    vulnerable: vm ? vm[1] : null,
+    distress: silent ? 0 : distressOf(raw),
+    tokens: tokenize(speech),
+    loc: silent ? { x: call.x, y: call.y, u: Math.max(call.acc, 25), kind: 'phone', label: 'Silent line, using phone location' } : locate(speech, call),
+    background: silent ? raw.replace(/[\[\]]/g, '').trim() : null
+  };
+}
+
+/* ---------- Step 3: same incident? ---------- */
+function compare(c, inc) {
+  let d = Infinity;
+  for (const m of inc.calls) d = Math.min(d, dist(c.f.loc, m.f.loc));
+  const span = SPAN[c.f.type || inc.type] || 200;
+  const sd = clamp(1 - Math.max(0, d - c.f.loc.u) / span, 0, 1);
+  const st = clamp(1 - (c.t - inc.lastT) / 900, 0, 1);
+  const conflict = !!(c.f.type && inc.type && c.f.type !== inc.type);
+  const sty = conflict ? 0 : (c.f.type && inc.type ? 1 : 0.5);
+  const sharedList = [...c.f.tokens].filter(w => inc.tokens.has(w));
+  const sw = c.f.tokens.size ? sharedList.length / c.f.tokens.size : 0;
+  let s = 0.35 * sd + 0.15 * st + 0.30 * sty + 0.20 * sw;
+  let note = '';
+  const rep = inc.calls.find(m => m.ani === c.ani && c.t - m.t <= 900);
+  if (rep) { s = Math.max(s, 0.95); note = 'same number called ' + fmtDur(c.t - rep.t) + ' earlier'; }
+  else if (conflict) { s = 0; note = 'kept apart: ' + TYPES[c.f.type].label.toLowerCase() + ' vs. ' + TYPES[inc.type].label.toLowerCase(); }
+  return { inc, s, d, sd, st, sty, sw, note, sharedList, gap: c.t - inc.lastT, incType: inc.type, repeat: !!rep, repeatGap: rep ? c.t - rep.t : 0 };
+}
+
+/* ---------- Step 4: score priority ---------- */
+function scoreCall(c, inc, how, prior, incidents) {
+  const f = c.f, r = [];
+  const add = (pts, label, kind, short) => r.push({ pts, label, kind, short });
+  const linked = !!inc;
+  const newThreats = linked ? f.threats.filter(p => !inc.threats.has(p)) : f.threats;
+  const knownThreats = linked ? f.threats.filter(p => inc.threats.has(p)) : [];
+  const repeat = prior.slice().reverse().find(m => m.ani === c.ani && c.t - m.t <= 900);
+  let zone = null;
+  if (f.silent) {
+    for (const i of incidents) if (i.calls.some(m => dist(m.f.loc, f.loc) <= 150)) { zone = i; break; }
+  }
+  const novelty = [];
+  if (linked) {
+    if (newThreats.length) novelty.push('new danger');
+    if (f.loc.kind === 'building' && f.loc.placeId && !inc.places.has(f.loc.placeId)) novelty.push('new address');
+    if (f.vulnerable && !inc.vulnerable) novelty.push('vulnerable person');
+    if (f.silent) novelty.push('caller can no longer speak');
+  }
+  if (newThreats.length) add(40, 'Life-threatening: ' + newThreats.map(p => '“' + p + '”').join(', '), 'threat', newThreats.map(p => '“' + p + '”').join(', '));
+  if (f.silent) {
+    if (zone) add(35, 'Silent line inside the danger zone of ' + zone.code, 'threat', 'Silent line in danger zone');
+    else add(15, 'Silent line, needs a welfare check', 'silent', 'Silent line');
+  }
+  if (!linked) add(30, how === 'split' ? 'First report (split out by dispatcher)' : 'First report of a new incident', 'new', 'New incident');
+  if (novelty.length) add(25, 'New information: ' + novelty.join(', '), 'novel', 'New info');
+  if (f.victim) add(20, 'Caller is the victim or inside the danger', 'victim', 'Caller in danger');
+  if (repeat) add(15, 'Same number called ' + fmtDur(c.t - repeat.t) + ' ago', 'repeat', 'Called back');
+  if (f.vulnerable) add(10, 'Vulnerable person: “' + f.vulnerable + '”', 'vuln', 'Vulnerable: ' + f.vulnerable);
+  const isDup = linked && !novelty.length && !repeat;
+  if (isDup) add(-20, 'Duplicate, nothing new', 'minus', 'Duplicate');
+  if (knownThreats.length && !newThreats.length) add(0, 'Already reported: ' + knownThreats.map(p => '“' + p + '”').join(', '), 'info');
+  if (f.distress > 0) add(f.distress, 'Caller distress ' + f.distress + '/5 (tiebreaker only)', 'distress');
+  if (how === 'merge') add(0, 'Merged by dispatcher', 'info', 'Merged by dispatcher');
+  const total = Math.max(0, r.reduce((s, x) => s + x.pts, 0));
+  const band = total >= 60 ? 'p1' : total >= 30 ? 'p2' : isDup ? 'dup' : 'p3';
+  return { reasons: r, total, band, isDup, zone, repeat, novelty };
+}
+
+/* ---------- Full pipeline: run every received call in order ---------- */
+function run(calls, overrides) {
+  const incidents = [], out = [];
+  let num = 412;
+  for (const src of calls) {
+    const c = { ...src };
+    c.f = extract(src);
+    c.comps = incidents.map(inc => compare(c, inc)).sort((a, b) => b.s - a.s);
+    const ov = overrides[c.id];
+    let target = null, how = 'auto';
+    if (ov === 'new') how = 'split';
+    else if (ov && ov.startsWith('join:')) {
+      target = incidents.find(i => i.calls.some(m => m.id === ov.slice(5))) || null;
+      how = target ? 'merge' : 'auto';
+    }
+    if (how === 'auto' && c.comps[0] && c.comps[0].s >= MATCH_THRESHOLD) target = c.comps[0].inc;
+    c.how = how;
+    c.sc = scoreCall(c, target, how, out, incidents);
+    /* Before pickup: confirmed duplicates are told help is coming and may hang up; life threats jump the line. */
+    c.pre = c.sc.isDup ? (src.stay ? 'stayed' : 'released') : (c.sc.band === 'p1' ? 'first' : 'line');
+    if (target) {
+      target.calls.push(c);
+      c.f.threats.forEach(p => target.threats.add(p));
+      if (c.f.loc.placeId) target.places.add(c.f.loc.placeId);
+      c.f.tokens.forEach(w => target.tokens.add(w));
+      if (c.f.vulnerable) target.vulnerable = true;
+      if (!target.type && c.f.type) target.type = c.f.type;
+      target.lastT = c.t;
+      c.inc = target;
+      c.opened = false;
+    } else {
+      const inc = {
+        id: c.id, code: 'INC-' + String(num++).padStart(4, '0'), type: c.f.type, calls: [c],
+        threats: new Set(c.f.threats), places: new Set(c.f.loc.placeId ? [c.f.loc.placeId] : []),
+        tokens: new Set(c.f.tokens), vulnerable: !!c.f.vulnerable, firstT: c.t, lastT: c.t,
+        anchor: { x: c.f.loc.x, y: c.f.loc.y }, where: c.f.loc.label, color: INC_COLORS[incidents.length % INC_COLORS.length]
+      };
+      incidents.push(inc);
+      c.inc = inc;
+      c.opened = true;
+    }
+    out.push(c);
+  }
+  out.forEach((c, i) => { c.arrival = i + 1; });
+  for (const inc of incidents) {
+    inc.top = inc.calls.reduce((m, c) => Math.max(m, c.sc.total), 0);
+    inc.hasP1 = inc.calls.some(c => c.sc.band === 'p1');
+    inc.dups = inc.calls.filter(c => c.sc.isDup).length;
+    inc.label = (inc.type ? TYPES[inc.type].label : 'Unknown, silent line');
+    inc.say = (inc.type ? TYPES[inc.type].say : 'the emergency') + ' at ' + placeShort(inc.where);
+  }
+  return { calls: out, incidents };
+}
+
+/* ---------- State ---------- */
+const state = {
+  now: LAST_T + 6, playing: false, speed: 4, view: 'triaged', filter: null,
+  open: new Set(), openDup: new Set(), selected: null, custom: [], overrides: {},
+  place: { x: 900, y: 452 }, fresh: new Set(), customSeq: 0, lastReleased: -1
+};
+let model = { calls: [], incidents: [] };
+
+function received() {
+  return SCRIPT.filter(c => c.t <= state.now).concat(state.custom)
+    .sort((a, b) => a.t - b.t || a.order - b.order);
+}
+SCRIPT.forEach((c, i) => { c.order = i; });
+
+function recompute() {
+  model = run(received(), state.overrides);
+  render();
+}
+
+/* ---------- Rendering ---------- */
+const $ = id => document.getElementById(id);
+const bandName = { p1: 'Immediate', p2: 'Urgent', p3: 'Routine', dup: 'Duplicate' };
+
+function incTag(inc) {
+  return '<span class="inc-tag" style="--ic:var(' + inc.color + ')"><i></i><b>' + esc(inc.code) + '</b> ' + esc(inc.label) + '</span>';
+}
+function chipsFor(c) {
+  return c.sc.reasons.filter(r => r.short && r.pts > 0).slice(0, 3).map(r =>
+    '<span class="chip' + (r.kind === 'threat' ? ' threat' : '') + '">' + esc(r.short) + '</span>').join('');
+}
+function placeShort(where) {
+  if (/^(Not stated|Silent line)/.test(where)) return 'your location';
+  return where.split(',')[0];
+}
+function ck(ok, label, detail) {
+  const cls = ok === true ? 'yes' : ok === false ? 'no' : 'maybe';
+  const mark = ok === true ? '✓' : ok === false ? '✗' : '–';
+  return '<li class="ck ' + cls + '"><span class="mark" aria-hidden="true">' + mark + '</span><span><b>' + label + '</b> ' + detail + '</span></li>';
+}
+function dedupeFor(c) {
+  const code = '<b>' + esc(c.inc.code) + '</b>';
+  const m = c.comps.find(x => x.inc === c.inc) || c.comps[0];
+  if (!m) return '<p class="outcome">No known incidents yet, so this call opened ' + code + ' and waits for a person.</p>';
+  const tA = c.f.type ? TYPES[c.f.type].label.toLowerCase() : null, tB = m.incType ? TYPES[m.incType].label.toLowerCase() : null;
+  const typeTxt = m.sty === 1 ? 'both ' + (tA || tB) : m.sty === 0 ? tA + ' vs. ' + tB : 'not clear from the words';
+  const said = c.f.loc.kind === 'phone' ? 'phone location' : placeShort(c.f.loc.label);
+  let h = '<p class="verdict-line">Checked against ' + '<b>' + esc(m.inc.code) + '</b> ' + esc(m.inc.label) + '</p><ul class="checks">' +
+    ck(m.sd >= 0.5, 'Place', esc(said) + ', ' + Math.round(m.d) + ' m from it') +
+    ck(m.sty === 1 ? true : m.sty === 0 ? false : null, 'Type', esc(typeTxt)) +
+    ck(m.sw >= 0.25, 'Words', m.sharedList.length ? 'shares “' + m.sharedList.slice(0, 4).map(esc).join('”, “') + '”' : 'nothing in common') +
+    ck(m.st >= 0.5, 'Time', fmtDur(m.gap) + ' after its last call') +
+    (m.repeat ? ck(true, 'Caller', 'same number called ' + fmtDur(m.repeatGap) + ' earlier') : '') +
+    '</ul><div class="match"><div class="row" style="--ic:var(' + m.inc.color + ')"><span class="mono" style="font-size:12px">Match</span>' +
+    '<div class="bar-mini" title="Needs 0.70 to count as the same incident"><span style="width:' + Math.round(m.s * 100) + '%"></span><i class="th"></i></div>' +
+    '<span class="verdict">' + m.s.toFixed(2) + (m.s >= MATCH_THRESHOLD ? ' ≥ ' : ' < ') + '0.70</span></div></div>';
+  let out;
+  if (c.how === 'merge') out = 'A dispatcher merged this call into ' + code + '.';
+  else if (c.how === 'split') out = 'A dispatcher split this call into its own incident, ' + code + '.';
+  else if (c.opened) out = 'Not a match, so it opened ' + code + ' and waits for a person.';
+  else if (c.sc.isDup) {
+    return h + '<div class="dialog">' +
+      '<p><span class="who">System</span>“Are you calling about ' + esc(c.inc.say) + '?”</p>' +
+      '<p><span class="who">Caller</span>“Yes.”</p>' +
+      '<p><span class="who">System</span>“Help is on the way. If anyone is hurt or you know something new, stay on the line.”</p></div>' +
+      '<p class="outcome">' + (c.pre === 'released' ? 'Caller hung up. The call is logged to ' + code + '.' : 'Caller stayed on and keeps a place in line. Logged to ' + code + '.') + '</p>';
+  }
+  else if (c.sc.novelty.length) out = 'Same incident, but the caller added something new (' + esc(c.sc.novelty.join(', ')) + '), so the system skips the confirmation and ' + (c.pre === 'first' ? 'moves the call to the front of the line.' : 'keeps it in line for a person.');
+  else out = 'Same incident, but this number already called, which can mean things got worse. A person takes it.';
+  return h + '<p class="outcome">' + out + '</p>';
+}
+function detailFor(c) {
+  const rows = c.sc.reasons.map(r => '<tr><td>' + esc(r.label) + '</td><td>' + (r.pts > 0 ? '+' : r.pts < 0 ? '−' : '') + Math.abs(r.pts) + '</td></tr>').join('');
+  let actions = '';
+  const ov = state.overrides[c.id];
+  if (ov) {
+    actions = '<button class="btn" type="button" data-act="undo" data-id="' + c.id + '">Undo dispatcher change</button>';
+  } else if (!c.opened) {
+    actions = '<button class="btn" type="button" data-act="split" data-id="' + c.id + '">Not the same emergency? Split it out</button>';
+  } else {
+    const earlier = model.incidents.filter(i => i !== c.inc && i.firstT <= c.t);
+    if (earlier.length) {
+      actions = '<label class="note" for="merge-' + c.id + '">Same emergency as</label><select id="merge-' + c.id + '" data-act="merge" data-id="' + c.id + '"><option value="">Choose an incident</option>' +
+        earlier.map(i => '<option value="' + i.id + '">' + esc(i.code + ' · ' + i.label) + '</option>').join('') + '</select>';
+    }
+  }
+  return '<div class="detail" data-stop="1"><div class="d-grid">' +
+    '<section><h4>Duplicate check, before pickup</h4>' + dedupeFor(c) + '</section>' +
+    '<section><h4>Priority score</h4><table class="bk">' + rows + '<tr class="total"><td>Total</td><td>' + c.sc.total + '</td></tr></table></section>' +
+    '</div>' + (actions ? '<div class="actions">' + actions + '</div>' : '') + '</div>';
+}
+function cardFor(c, pos) {
+  const open = state.open.has(c.id);
+  const cls = ['call', c.sc.band, open ? 'open' : '', state.selected === c.id ? 'sel' : '', state.fresh.has(c.id) ? 'new' : ''].join(' ');
+  const tx = '<p class="tx' + (c.f.silent ? ' silent' : '') + '">' + (c.f.silent ? esc(c.text) : '“' + esc(c.text) + '”') + '</p>';
+  const meta = '<span class="meta">#' + String(c.arrival).padStart(2, '0') + ' · ' + fmtClock(START_CLOCK + c.t) + '</span>';
+  const top = '<div class="top"><span class="pill ' + c.sc.band + '">' + bandName[c.sc.band] + '</span><span class="score" title="Priority score">' + c.sc.total + '</span>' + incTag(c.inc) + meta + '</div>';
+  let chipHtml;
+  if (c.sc.isDup) chipHtml = '<span class="chip ok">✓ Caller confirmed same incident · ' + (c.pre === 'released' ? 'hung up' : 'stayed on') + '</span>';
+  else chipHtml = chipsFor(c);
+  const chips = chipHtml && !open ? '<div class="reasons">' + chipHtml + '</div>' : '';
+  return '<article class="' + cls + '" tabindex="0" data-id="' + c.id + '" aria-expanded="' + open + '">' +
+    '<div class="pos">' + pos + '</div><div class="body">' + top + tx + chips + (open ? detailFor(c) : '') + '</div></article>';
+}
+function lineOrder(calls) {
+  const byScore = (a, b) => b.sc.total - a.sc.total || a.t - b.t;
+  return calls.filter(c => c.pre === 'first').sort(byScore).concat(calls.filter(c => c.pre === 'line' || c.pre === 'stayed').sort(byScore));
+}
+function renderQueue() {
+  let calls = model.calls.slice();
+  if (state.filter) calls = calls.filter(c => c.inc.id === state.filter);
+  const q = $('queue');
+  const fi = state.filter && model.incidents.find(i => i.id === state.filter);
+  $('filter-slot').innerHTML = fi ? '<span class="filter-chip">Showing ' + esc(fi.code) + ' only<button type="button" data-act="clear-filter">Show all</button></span>' : '';
+  if (!calls.length) {
+    q.innerHTML = '<div class="empty">No one is waiting. Press Play to start the surge.</div>';
+    return;
+  }
+  if (state.view === 'arrival') {
+    calls.sort((a, b) => a.arrival - b.arrival);
+    q.innerHTML = '<div class="group-h">Answered in the order they called <span class="n">' + calls.length + '</span><span class="rule"></span></div>' + calls.map((c, i) => cardFor(c, i + 1)).join('');
+    return;
+  }
+  const line = lineOrder(calls);
+  const first = line.filter(c => c.pre === 'first'), rest = line.filter(c => c.pre !== 'first');
+  let html = '', pos = 0;
+  if (first.length) {
+    html += '<div class="group-h p1">Pick up first <span class="n">' + first.length + '</span><span class="rule"></span></div>';
+    html += first.map(c => cardFor(c, ++pos)).join('');
+  }
+  if (rest.length) {
+    html += '<div class="group-h">Then in line <span class="n">' + rest.length + '</span><span class="rule"></span></div>';
+    html += rest.map(c => cardFor(c, ++pos)).join('');
+  }
+  const gone = calls.filter(c => c.pre === 'released');
+  if (gone.length) {
+    html += '<div class="group-h ok">Confirmed duplicates, told help is coming <span class="n">' + gone.length + '</span><span class="rule"></span></div>';
+    const byInc = new Map();
+    for (const c of gone) { if (!byInc.has(c.inc)) byInc.set(c.inc, []); byInc.get(c.inc).push(c); }
+    for (const [inc, list] of byInc) {
+      const open = state.openDup.has(inc.id);
+      html += '<div class="dup-group" style="--ic:var(' + inc.color + ')"><button type="button" class="dup-head" data-act="dup" data-inc="' + inc.id + '" aria-expanded="' + open + '">' +
+        '<span class="inc-tag"><i></i><b>' + esc(inc.code) + '</b> ' + esc(inc.label) + '</span><span class="dup-n">' + list.length + ' caller' + (list.length === 1 ? '' : 's') + ' confirmed, hung up</span>' +
+        '<span class="more">' + (open ? 'Hide' : 'Show') + '</span></button>' +
+        (open ? '<div class="dup-list">' + list.map(c => cardFor(c, '✓')).join('') + '</div>' : '') + '</div>';
+    }
+  }
+  q.innerHTML = html;
+}
+function renderMetrics() {
+  const calls = model.calls, n = calls.length;
+  $('m-calls').textContent = n;
+  $('m-match').textContent = calls.filter(c => !c.opened).length;
+  $('m-inc').textContent = model.incidents.length;
+  $('m-dup').textContent = calls.filter(c => c.sc.isDup).length;
+  const p1 = calls.filter(c => c.pre === 'first');
+  $('m-p1').textContent = p1.length;
+  if (!p1.length) { $('m-wait').textContent = '–'; return; }
+  const fifo = p1.reduce((s, c) => s + (c.arrival - 1), 0) / p1.length;
+  const line = lineOrder(calls);
+  const tri = p1.reduce((s, c) => s + line.indexOf(c), 0) / p1.length;
+  $('m-wait').innerHTML = fifo.toFixed(1) + '<span class="arrow">→</span><span class="after">' + tri.toFixed(1) + '</span>';
+}
+function renderIncidents() {
+  const list = $('inc-list');
+  if (!model.incidents.length) { list.innerHTML = '<div class="empty" style="margin:12px">No incidents yet.</div>'; return; }
+  list.innerHTML = model.incidents.slice().sort((a, b) => b.top - a.top || a.firstT - b.firstT).map(i =>
+    '<button type="button" class="inc-row' + (state.filter === i.id ? ' on' : '') + '" data-inc="' + i.id + '" style="--ic:var(' + i.color + ')"><i></i>' +
+    '<span class="name">' + esc(i.code) + ' · ' + esc(i.label) + '<small>' + esc(i.where) + '</small></span>' +
+    '<span class="cnt">' + i.calls.length + ' call' + (i.calls.length === 1 ? '' : 's') + '</span></button>'
+  ).join('');
+}
+
+/* Map */
+function baseMap() {
+  const XS = [200, 360, 620, 880, 1140, 1400, 1640], YS = [-40, 160, 300, 440, 580, 760, 900, 1040];
+  let s = '<rect class="m-street" x="0" y="0" width="1600" height="1000"/>';
+  for (let i = 0; i < XS.length - 1; i++) for (let j = 0; j < YS.length - 1; j++) {
+    const x0 = XS[i] + 22, y0 = YS[j] + 22, w = XS[i + 1] - XS[i] - 44, h = YS[j + 1] - YS[j] - 44;
+    s += '<rect class="m-block" x="' + x0 + '" y="' + y0 + '" width="' + w + '" height="' + h + '" rx="10"/>';
+  }
+  s += '<rect class="m-water" x="0" y="0" width="166" height="1000"/>';
+  s += '<rect class="m-hwy" x="172" y="0" width="34" height="1000"/>';
+  s += '<rect class="m-bridge" x="-4" y="744" width="182" height="32"/>';
+  s += '<rect class="m-bldg" x="398" y="198" width="128" height="74" rx="4"/><rect class="m-bldg" x="540" y="198" width="52" height="74" rx="4"/>';
+  s += '<rect class="m-bldg" x="752" y="490" width="58" height="58" rx="4"/><rect class="m-bldg" x="1440" y="926" width="110" height="60" rx="4"/>';
+  for (const st of STREETS.h) s += '<text class="m-label" x="1588" y="' + (st.y + 9) + '" text-anchor="end">' + esc(st.name) + '</text>';
+  for (const st of STREETS.v) s += '<text class="m-label" x="' + (st.x + 9) + '" y="140" text-anchor="end" transform="rotate(-90 ' + (st.x + 9) + ' 140)">' + esc(st.name) + '</text>';
+  s += '<text class="m-label" x="198" y="560" text-anchor="middle" transform="rotate(-90 198 560)">Shore Expwy</text>';
+  s += '<text class="m-label" x="92" y="420" text-anchor="middle" transform="rotate(-90 92 420)">Harbor Channel</text>';
+  return s;
+}
+const BASE = baseMap();
+function renderMap() {
+  let s = BASE;
+  const incs = model.incidents;
+  for (const c of model.calls) {
+    const ic = c.inc.color, dim = state.filter && c.inc.id !== state.filter;
+    s += '<g style="--ic:var(' + ic + ')"' + (dim ? ' opacity="0.25"' : '') + '>';
+    s += '<circle class="m-acc" cx="' + c.x + '" cy="' + c.y + '" r="' + Math.max(c.acc, 12) + '"/>';
+    if (c.f.loc.kind !== 'phone' && dist(c, c.f.loc) > 50) s += '<line class="m-link" x1="' + c.x + '" y1="' + c.y + '" x2="' + c.f.loc.x + '" y2="' + c.f.loc.y + '"/>';
+    s += '</g>';
+  }
+  for (const inc of incs) {
+    const dim = state.filter && inc.id !== state.filter;
+    const r = 34 + 9 * Math.sqrt(inc.calls.length);
+    const { x, y } = inc.anchor;
+    const tagW = 44 + 17 * (7 + String(inc.calls.length).length);
+    const tx = clamp(x - tagW / 2, 8, 1592 - tagW), ty = clamp(y - r - 58, 6, 940);
+    s += '<g class="g-inc' + (dim ? ' dim' : '') + '" data-inc="' + inc.id + '" style="--ic:var(' + inc.color + ')"><title>' + esc(inc.code + ' · ' + inc.label + ' · ' + inc.calls.length + ' calls') + '</title>';
+    if (inc.hasP1) s += '<circle class="m-inc-ring" cx="' + x + '" cy="' + y + '" r="' + (r + 12) + '"/>';
+    s += '<circle class="m-inc" cx="' + x + '" cy="' + y + '" r="' + r + '"/>';
+    s += '<rect class="m-tag-bg" x="' + tx + '" y="' + ty + '" width="' + tagW + '" height="42" rx="8"/>';
+    s += '<text class="m-tag" x="' + (tx + tagW / 2) + '" y="' + (ty + 30) + '" text-anchor="middle">' + inc.code.slice(4) + ' · ' + inc.calls.length + '</text></g>';
+  }
+  for (const c of model.calls) {
+    const dim = state.filter && c.inc.id !== state.filter;
+    s += '<circle class="m-phone' + (c.f.silent ? ' silent' : '') + (state.selected === c.id ? ' hot' : '') + '" style="--ic:var(' + c.inc.color + ')" cx="' + c.x + '" cy="' + c.y + '" r="' + (state.selected === c.id ? 15 : 10) + '"' + (dim ? ' opacity="0.25"' : '') + '><title>' + esc('#' + c.arrival + ' ' + phone(c.ani)) + '</title></circle>';
+  }
+  const p = state.place;
+  s += '<g pointer-events="none"><circle class="m-cc" cx="' + p.x + '" cy="' + p.y + '" r="22"/><circle class="m-cc-dot" cx="' + p.x + '" cy="' + p.y + '" r="6"/>' +
+    '<line class="m-cc" x1="' + (p.x - 36) + '" y1="' + p.y + '" x2="' + (p.x - 26) + '" y2="' + p.y + '"/><line class="m-cc" x1="' + (p.x + 26) + '" y1="' + p.y + '" x2="' + (p.x + 36) + '" y2="' + p.y + '"/></g>';
+  $('map').innerHTML = s;
+}
+function renderClock() {
+  $('clock').textContent = fmtClock(START_CLOCK + Math.max(0, state.now));
+  const done = state.now >= LAST_T;
+  $('clock-sub').textContent = state.playing ? 'Surge playing' : done ? 'Surge complete' : 'Paused';
+  $('btn-play').textContent = state.playing ? 'Pause' : 'Play';
+}
+function renderWhere() {
+  const p = state.place;
+  let near = null, nd = Infinity;
+  for (const pl of PLACES) { const d = dist(pl, p); if (d < nd) { nd = d; near = pl; } }
+  $('cc-where').innerHTML = 'Phone placed ' + (nd < 120 ? 'at <b>' + esc(near.short) + '</b>' : '<b>' + Math.round(nd) + ' m</b> from ' + esc(near.short)) + '. Click the map to move it.';
+}
+function render() {
+  renderClock();
+  renderMetrics();
+  renderQueue();
+  renderIncidents();
+  renderMap();
+  renderWhere();
+  document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+  document.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === state.speed)));
+}
+
+/* ---------- Playback ---------- */
+let timer = null, lastTick = 0;
+function releasedCount() { return SCRIPT.filter(c => c.t <= state.now).length; }
+function tick(ts) {
+  if (!state.playing) return;
+  const dt = lastTick ? (ts - lastTick) / 1000 : 0;
+  lastTick = ts;
+  const before = releasedCount();
+  state.now += dt * state.speed;
+  const after = releasedCount();
+  if (after !== before) {
+    state.fresh = new Set(SCRIPT.slice(before, after).map(c => c.id));
+    recompute();
+  } else renderClock();
+  if (state.now >= LAST_T + 2) { state.playing = false; renderClock(); return; }
+  timer = requestAnimationFrame(tick);
+}
+function play() {
+  if (state.now >= LAST_T) return;
+  state.playing = true; lastTick = 0;
+  cancelAnimationFrame(timer);
+  timer = requestAnimationFrame(tick);
+  renderClock();
+}
+function pause() { state.playing = false; cancelAnimationFrame(timer); renderClock(); }
+function replay() {
+  pause();
+  state.now = -3; state.custom = []; state.overrides = {}; state.open.clear(); state.selected = null; state.filter = null; state.fresh = new Set();
+  recompute();
+  play();
+}
+function step() {
+  pause();
+  const next = SCRIPT.find(c => c.t > state.now);
+  if (!next) return;
+  state.now = next.t;
+  state.fresh = new Set([next.id]);
+  recompute();
+}
+function skipEnd() {
+  pause();
+  state.now = Math.max(state.now, LAST_T + 2);
+  state.fresh = new Set();
+  recompute();
+}
+
+/* ---------- Events ---------- */
+$('btn-replay').addEventListener('click', replay);
+$('btn-play').addEventListener('click', () => (state.playing ? pause() : play()));
+$('btn-end').addEventListener('click', skipEnd);
+document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => { state.speed = Number(b.dataset.speed); render(); }));
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => { state.view = b.dataset.view; state.fresh = new Set(); render(); }));
+
+function toggleCall(id) {
+  if (state.open.has(id)) { state.open.delete(id); if (state.selected === id) state.selected = null; }
+  else { state.open.add(id); state.selected = id; }
+  state.fresh = new Set();
+  render();
+}
+$('queue').addEventListener('click', e => {
+  const act = e.target.closest('[data-act]');
+  if (act && act.tagName === 'BUTTON') {
+    const id = act.dataset.id;
+    if (act.dataset.act === 'dup') {
+      const k = act.dataset.inc;
+      state.openDup.has(k) ? state.openDup.delete(k) : state.openDup.add(k);
+      state.fresh = new Set(); renderQueue(); return;
+    }
+    if (act.dataset.act === 'split') { state.overrides[id] = 'new'; state.fresh = new Set(); recompute(); }
+    else if (act.dataset.act === 'undo') { delete state.overrides[id]; state.fresh = new Set(); recompute(); }
+    return;
+  }
+  if (e.target.closest('[data-stop]')) return;
+  const card = e.target.closest('.call');
+  if (card) toggleCall(card.dataset.id);
+});
+$('queue').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-act="merge"]');
+  if (!sel || !sel.value) return;
+  state.overrides[sel.dataset.id] = 'join:' + sel.value;
+  state.fresh = new Set();
+  recompute();
+});
+$('queue').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('call')) { e.preventDefault(); toggleCall(e.target.dataset.id); }
+});
+$('filter-slot').addEventListener('click', e => { if (e.target.closest('[data-act="clear-filter"]')) { state.filter = null; render(); } });
+$('inc-list').addEventListener('click', e => {
+  const row = e.target.closest('[data-inc]');
+  if (!row) return;
+  state.filter = state.filter === row.dataset.inc ? null : row.dataset.inc;
+  state.fresh = new Set();
+  render();
+});
+$('map').addEventListener('click', e => {
+  const g = e.target.closest('[data-inc]');
+  if (g) { state.filter = state.filter === g.dataset.inc ? null : g.dataset.inc; state.fresh = new Set(); render(); return; }
+  const svg = $('map');
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const m = svg.getScreenCTM();
+  if (!m) return;
+  const p = pt.matrixTransform(m.inverse());
+  state.place = { x: Math.round(clamp(p.x, 0, 1600)), y: Math.round(clamp(p.y, 0, 1000)) };
+  renderMap();
+  renderWhere();
+});
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  const p = PRESETS[Number(b.dataset.preset)];
+  $('cc-text').value = p.text;
+  $('cc-acc').value = p.acc;
+  state.place = { x: p.x, y: p.y };
+  renderMap();
+  renderWhere();
+}));
+$('cc-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = $('cc-text').value.trim();
+  if (!text) { $('cc-note').textContent = 'Add a transcript first, or pick an example call.'; return; }
+  const id = 'u' + (++state.customSeq);
+  const rawAni = $('cc-ani').value.trim() || '(718) 555-0101';
+  const digits = rawAni.replace(/\D/g, '');
+  const ani = digits.length >= 4 && rawAni.includes('555-01') ? digits.slice(-4) : rawAni;
+  const t = Math.max(0, state.now);
+  state.custom.push({ id, t, order: 1000 + state.customSeq, ani, x: state.place.x, y: state.place.y, acc: Number($('cc-acc').value), text, silent: /^\s*\[/.test(text) });
+  state.fresh = new Set([id]);
+  state.open.add(id); state.selected = id; state.filter = null; state.view = 'triaged';
+  recompute();
+  const c = model.calls.find(x => x.id === id);
+  $('cc-note').textContent = c ? 'Added as ' + bandName[c.sc.band] + ' (' + c.sc.total + '), ' + (c.opened ? 'opened ' : 'linked to ') + c.inc.code + '.' : '';
+  const n = Number(digits.slice(-2));
+  $('cc-ani').value = '(718) 555-01' + String(((isFinite(n) ? n : 0) + 1) % 100).padStart(2, '0');
+  const el = document.querySelector('.call[data-id="' + id + '"]');
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+
+window.__triage = { run: () => run(SCRIPT, {}), state, model: () => model };
+recompute();
+})();
+</script>
+
+</body></html>
