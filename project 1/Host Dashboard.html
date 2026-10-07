@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chili's · Host Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F1F3F6;--card:#fff;--ink:#1D2733;--mute:#66727F;--line:#E3E7EC;--acc:#0F7B6C;--accsoft:#DDF1EE;--bad:#B3261E;--badsoft:#FBE6E3;--warn:#8A5A00;--warnsoft:#FCF0D2;--side:#18232E;--sidetx:#C9D3DD;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F151B;--card:#18212A;--ink:#E8EDF2;--mute:#97A4B0;--line:#2A3641;--acc:#4FC3B5;--accsoft:#173A37;--bad:#FF8A80;--badsoft:#3D1E1B;--warn:#F2C25B;--warnsoft:#3A2C0E;--side:#0B1015}}
+:root[data-theme="dark"]{--bg:#0F151B;--card:#18212A;--ink:#E8EDF2;--mute:#97A4B0;--line:#2A3641;--acc:#4FC3B5;--accsoft:#173A37;--bad:#FF8A80;--badsoft:#3D1E1B;--warn:#F2C25B;--warnsoft:#3A2C0E;--side:#0B1015}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 Figtree,system-ui,-apple-system,"Segoe UI",sans-serif}
+.app{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+aside{background:var(--side);color:var(--sidetx);padding:18px 12px;display:flex;flex-direction:column;gap:6px}
+.brand{font-weight:700;font-size:18px;color:#fff;padding:0 8px}.brand small{display:block;font-weight:400;font-size:12px;color:var(--sidetx)}
+aside nav{display:flex;flex-direction:column;gap:4px;margin:18px 0}
+aside nav button{display:flex;justify-content:space-between;align-items:center;text-align:left;background:none;border:0;color:var(--sidetx);padding:10px;border-radius:8px;min-height:42px}
+aside nav button[aria-current="true"]{background:rgba(255,255,255,.12);color:#fff}
+aside nav button:hover{background:rgba(255,255,255,.08)}
+.badge{background:#E8A317;color:#1D1400;border-radius:99px;font-size:12px;padding:1px 8px;font-weight:700}
+.status{margin-top:auto;font-size:13px;padding:8px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF6B5E;margin-right:6px}
+main{padding:20px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+h1{font-size:22px;margin:0}h3{font-size:16px;margin:0 0 4px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat span{font-size:13px;color:var(--mute)}.stat b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.stat.hot{background:var(--warnsoft);border-color:var(--warn)}.stat.hot b,.stat.hot span{color:var(--warn)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.cols{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+button{font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:40px;padding:6px 14px;border-radius:8px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--card)}
+button.sm{min-height:34px;padding:3px 12px;font-size:14px}
+button.bad{color:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--mute);font-weight:600;background:var(--bg)}
+tr.done td,tr.canceled td{opacity:.45}
+.tag{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--bg);color:var(--mute)}
+.tag.g{background:var(--accsoft);color:var(--acc)}.tag.y{background:var(--warnsoft);color:var(--warn)}.tag.r{background:var(--badsoft);color:var(--bad)}
+.form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.form label{display:flex;flex-direction:column;font-size:13px;font-weight:600;gap:4px}
+input,select{font:inherit;min-height:40px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+.tbl{border:2px solid var(--line);border-radius:12px;padding:8px;min-height:74px;font-size:13px;text-align:center}
+.tbl.sq{border-radius:22px}.tbl b{display:block;font-size:14px}
+.tbl.on{background:var(--accsoft);border-color:var(--acc);color:var(--ink)}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--mute);margin-top:10px}
+.note{padding:10px 14px;border-radius:10px;background:var(--accsoft);color:var(--acc);font-weight:600;margin-bottom:14px}
+.note.warn{background:var(--warnsoft);color:var(--warn)}
+.prog{height:10px;background:var(--bg);border-radius:99px;overflow:hidden;margin:8px 0 4px}.prog i{display:block;height:100%;background:var(--acc)}
+.call{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.call:last-child{border:0}.call small{display:block;color:var(--mute)}
+.empty{text-align:center;color:var(--mute);padding:22px 8px}
+@media(max-width:860px){.app{grid-template-columns:1fr}aside{flex-direction:row;flex-wrap:wrap;align-items:center}aside nav{flex-direction:row;margin:0;flex-wrap:wrap}.status{margin:0}.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const m=t=>{const [h,i]=t.split(':');return h*60+ +i};
+const f=x=>{const h=Math.floor(x/60);return ((h+11)%12+1)+':'+pad(x%60)+(h>=12?' PM':' AM')};
+const TABLES=[...Array(6)].map((_,i)=>({id:'T'+(i+1),cap:2})).concat([...Array(5)].map((_,i)=>({id:'F'+(i+1),cap:4})),[{id:'S1',cap:6},{id:'S2',cap:6},{id:'L1',cap:8}]);
+const SLOTS=[];for(let x=17*60;x<=21*60+30;x+=30)SLOTS.push(pad(Math.floor(x/60))+':'+pad(x%60));
+// Mock OpenTable snapshot: last copy saved before the outage
+const BOOKS='Park,2,17:00|Okafor,4,17:00|Lindqvist,2,17:30|Reyes,6,17:30|Chen,4,18:00|Moreau,2,18:30|Walsh,8,18:30|Bianchi,4,19:00|Adeyemi,2,19:00|Tran,2,19:30|Fischer,4,20:00|Novak,2,21:00';
+const SNAP={at:'2:47 PM',list:BOOKS.split('|').map((b,i)=>{const[n,p,t]=b.split(',');return{name:n,party:+p,time:t,phone:'(212) 555-01'+pad(10+i)}})};
+let S,id;
+const init=()=>{id=0;S={view:'snap',loaded:false,replied:false,res:[],name:'',party:2,when:'now',note:null}};
+const active=()=>S.res.filter(r=>r.st!=='canceled');
+const need=()=>active().filter(r=>r.src!=='walk-in');
+const pend=()=>S.replied?S.res.filter(r=>r.sent&&!r.conf&&r.st==='booked'):[];
+function loadSnap(){
+  SNAP.list.forEach(b=>S.res.push({id:++id,name:b.name,party:b.party,time:b.time,phone:b.phone,src:'resyos',st:'booked',table:null,conf:null,sent:false,tries:0}));
+  S.loaded=true;
+}
+function seat(r){
+  const used=S.res.filter(x=>x.st==='seated').map(x=>x.table);
+  const t=TABLES.filter(x=>x.cap>=r.party&&!used.includes(x.id)).sort((a,b)=>a.cap-b.cap)[0];
+  if(!t){S.note={warn:1,t:`No open table for ${r.party}. Quote ${esc(r.name)} a wait.`};return}
+  r.st='seated';r.table=t.id;S.note={t:`${esc(r.name)} seated at ${t.id}.`};
+}
+function stats(){
+  const A=active(),N=need(),c=N.filter(r=>r.conf).length,call=pend().length;
+  const T=[['Parties',A.length],['Covers',A.reduce((a,r)=>a+r.party,0)],['Seated',A.filter(r=>r.st==='seated').length],['Confirmed',`${c}/${N.length}`],['To call',call]];
+  return`<div class="stats">${T.map(([l,v])=>`<div class="stat ${l==='To call'&&v?'hot':''}"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`;
+}
+function snap(){
+  const rows=SNAP.list.map(b=>`<tr><td>${f(m(b.time))}</td><td><b>${esc(b.name)}</b></td><td>${b.party}</td><td>${b.phone}</td></tr>`).join('');
+  return`<div class="panel"><h3>OpenTable snapshot</h3><p class="sub"></p>
+  <div class="scroll"><table><tr><th>Time</th><th>Guest</th><th>Party</th><th>Phone</th></tr>${rows}</table></div><p></p>
+  ${S.loaded?`<div class="note">Loaded ${SNAP.list.length} bookings. Next, confirm guests under Confirmations.</div><div class="bar"><button class="pri" data-act="view" data-v="host">Open host stand</button><button data-act="view" data-v="conf">Go to confirmations</button></div>`:'<button class="pri" data-act="load">Load snapshot</button>'}</div>`;
+}
+function ctag(r){
+  if(r.src==='walk-in')return'<span class="tag">Walk-in</span>';
+  if(r.conf)return`<span class="tag g">Confirmed · ${r.conf}</span>`;
+  if(r.tries)return`<span class="tag r">No answer ×${r.tries}</span>`;
+  if(S.replied&&r.sent)return'<span class="tag y">Needs call</span>';
+  if(r.sent)return'<span class="tag y">Awaiting reply</span>';
+  return'<span class="tag">Not contacted</span>';
+}
+function host(){
+  const rows=[...S.res].sort((a,b)=>({done:1,canceled:2}[a.st]||0)-({done:1,canceled:2}[b.st]||0)||(a.time?m(a.time):-1)-(b.time?m(b.time):-1)||a.id-b.id).map(r=>`<tr class="${r.st}">
+    <td>${r.time?f(m(r.time)):'Now'}</td><td><b>${esc(r.name)}</b></td><td>${r.party}</td><td>${r.st==='canceled'?'<span class="tag r">Canceled</span>':ctag(r)}</td>
+    <td>${r.st==='booked'?`<button class="sm pri" data-act="seat" data-id="${r.id}">Seat</button>`:r.st==='seated'?`${r.table} <button class="sm" data-act="clear" data-id="${r.id}">Clear</button>`:''}</td></tr>`).join('');
+  const cells=TABLES.map(t=>{const g=S.res.find(r=>r.st==='seated'&&r.table===t.id);
+    return`<div class="tbl ${t.cap>2?'sq':''} ${g?'on':''}"><b>${t.id}</b>${g?`${esc(g.name)}<br>${g.party} of ${t.cap}`:`<span class="sub">Open · ${t.cap}</span>`}</div>`}).join('');
+  return`<div class="panel"><h3>Add a guest</h3><p class="sub">Walk-ins are seated right away. Phone bookings join the list.</p>
+  <div class="form"><label>Name<input id="nm" data-k="name" value="${esc(S.name)}" placeholder="Guest name"></label>
+  <label>Party<select data-k="party">${[1,2,3,4,5,6,7,8].map(n=>`<option ${n===S.party?'selected':''}>${n}</option>`).join('')}</select></label>
+  <label>When<select data-k="when"><option value="now">Walk-in, now</option>${SLOTS.map(t=>`<option value="${t}" ${S.when===t?'selected':''}>Phone booking, ${f(m(t))}</option>`).join('')}</select></label>
+  <button class="pri" data-act="add">Add guest</button></div></div>
+  <div class="cols"><div class="panel"><h3>Tonight's guests</h3>${S.res.length?`<div class="scroll"><table><tr><th>Time</th><th>Guest</th><th>Party</th><th>Confirmation</th><th></th></tr>${rows}</table></div>`:'<p class="empty">No guests yet.</p>'}</div>
+  <div class="panel"><h3>Floor</h3><div class="floor">${cells}</div><div class="legend"><span>Outlined: open</span><span>Green: seated</span></div></div></div>`;
+}
+function conf(){
+  const N=need(),sentN=N.filter(r=>r.sent||r.conf).length,c=N.filter(r=>r.conf).length,P=pend();
+  const unsent=N.filter(r=>!r.sent&&!r.conf&&r.st==='booked').length;
+  const calls=!S.replied?`<p class="empty">${sentN?'Waiting for replies.':'Send texts first.'}</p>`:P.length?P.map(r=>`<div class="call"><div><b>${esc(r.name)}</b> · party of ${r.party} · ${f(m(r.time))}<small>${r.phone}${r.tries?` · no answer ×${r.tries}`:''}</small></div>
+    <div class="bar"><button class="sm pri" data-act="reached" data-id="${r.id}">Reached, confirmed</button><button class="sm" data-act="noans" data-id="${r.id}">No answer</button><button class="sm bad" data-act="cancel" data-id="${r.id}">Cancel booking</button></div></div>`).join(''):'<p class="empty ok">Everyone is confirmed or released.</p>';
+  return`<div class="panel"><h3>1. Text everyone</h3><p class="sub">Send "Your table is still on. Reply Y to confirm." to every guest on the list.</p>
+  <div class="bar"><button class="pri" data-act="text" ${unsent?'':'disabled'}>Text ${unsent||''} guests</button><span class="sub" style="margin:0">${sentN} of ${N.length} texted</span></div></div>
+  <div class="panel"><h3>2. Replies</h3><div class="prog"><i style="width:${N.length?c/N.length*100:0}%"></i></div><p class="sub">${c} of ${N.length} confirmed</p>
+  <button data-act="replies" ${sentN&&!S.replied?'':'disabled'}>Simulate replies</button></div>
+  <div class="panel"><h3>3. Call to confirm</h3><p class="sub">Guests who didn't reply. Call them, and release the table if they cancel.</p>${calls}</div>`;
+}
+function render(){
+  const nav=[['snap','Data Recovery'],['host','Host stand'],['conf','Confirmations']];
+  const title={snap:'',host:'Host stand',conf:'Confirmations'}[S.view];
+  $('#app').innerHTML=`<aside><div class="brand">Chili's<small>Host dashboard</small></div>
+  <nav>${nav.map(([k,l])=>`<button data-act="view" data-v="${k}" aria-current="${S.view===k}">${l}${k==='conf'&&pend().length?`<span class="badge">${pend().length}</span>`:''}</button>`).join('')}</nav>
+  <div class="status"><span class="dot"></span>OpenTable offline<br><span style="opacity:.7">Snapshot ${SNAP.at}</span><br><button class="sm" style="margin-top:8px" data-act="reset">Reset demo</button></div></aside>
+  <main><div class="top"><h1>${title}</h1><span class="sub">Friday · 3:15 PM</span></div>${stats()}
+  ${S.note&&S.view!=='snap'?`<div class="note ${S.note.warn?'warn':''}">${S.note.t}</div>`:''}${{snap,host,conf}[S.view]()}</main>`;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,r=S.res.find(x=>x.id==b.dataset.id);
+  if(a==='view'){S.view=b.dataset.v;S.note=null}
+  if(a==='reset')init();
+  if(a==='load')loadSnap();
+  if(a==='seat')seat(r);
+  if(a==='clear'){r.st='done';S.note={t:`${esc(r.name)} cleared. ${r.table} is open.`}}
+  if(a==='add'){
+    const nm=S.name.trim();
+    if(!nm)S.note={warn:1,t:'Enter a name first.'};
+    else{const w=S.when==='now';const g={id:++id,name:nm,party:+S.party,time:w?null:S.when,phone:'—',src:w?'walk-in':'phone',st:'booked',table:null,conf:w?null:'phone',sent:false,tries:0};
+      S.res.push(g);S.name='';S.note={t:`${esc(nm)} added.`};if(w)seat(g)}
+  }
+  if(a==='text'){S.res.forEach(x=>{if(x.src!=='walk-in'&&!x.conf&&x.st==='booked')x.sent=true});S.note={t:'Texts sent. Replies will come in.'}}
+  if(a==='replies'){S.replied=true;S.res.forEach(x=>{if(x.sent&&!x.conf&&x.id%4!==0)x.conf='text'});S.note={t:'Replies in. Call the guests who stayed quiet.'}}
+  if(a==='reached'){r.conf='call';S.note={t:`${esc(r.name)} confirmed by phone.`}}
+  if(a==='noans'){r.tries++;S.note={warn:1,t:`No answer from ${esc(r.name)}. Try again shortly.`}}
+  if(a==='cancel'){r.st='canceled';S.note={t:`${esc(r.name)}'s booking released.`}}
+  render();
+});
+document.addEventListener('input',e=>{if(e.target.dataset.k)S[e.target.dataset.k]=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nm')$('[data-act="add"]').click()});
+init();render();
+</script>
+</body>
+</html>
