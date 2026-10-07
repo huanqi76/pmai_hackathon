@@ -1,0 +1,546 @@
+<title>Garden Route Finder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: street-sign header strip, schematic map left, operations panel right; stacks on phones. */
+:root{
+  --bg:#f3f1ec; --panel:#ffffff; --fg:#1b2130; --muted:#5f6675; --line:#d9d5cc;
+  --road:#ffffff; --road-edge:#c9c4b8; --water:#d6e3ea; --park:#d9e6c8; --label:#6d7280;
+  --accent:#1d3f8a; --parade:#f58426;
+  --confirmed:#c8322b; --probable:#d98a08; --rumored:#8a7fa8; --slow:#3a7bb8;
+  --route:#1d3f8a; --baseline:#9aa1ad; --chip:#eceae3; --bus:#1f8a7a;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#13161d; --panel:#1b1f28; --fg:#ebe9e2; --muted:#a3a8b4; --line:#2d323d;
+  --road:#262b36; --road-edge:#3a404d; --water:#172633; --park:#1f2d1f; --label:#9aa0ab;
+  --accent:#7fa2f0; --parade:#f58426;
+  --confirmed:#f06a60; --probable:#f0b545; --rumored:#a99cc9; --slow:#6fa9e0;
+  --route:#8fb0ff; --baseline:#5b6270; --chip:#262b36; --bus:#3fc2ad; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#13161d; --panel:#1b1f28; --fg:#ebe9e2; --muted:#a3a8b4; --line:#2d323d;
+  --road:#262b36; --road-edge:#3a404d; --water:#172633; --park:#1f2d1f; --label:#9aa0ab;
+  --accent:#7fa2f0; --parade:#f58426;
+  --confirmed:#f06a60; --probable:#f0b545; --rumored:#a99cc9; --slow:#6fa9e0;
+  --route:#8fb0ff; --baseline:#5b6270; --chip:#262b36; --bus:#3fc2ad; color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;margin:0}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:12px 24px;display:flex;flex-direction:column;gap:12px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.sign{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;padding-bottom:10px;border-bottom:3px solid var(--fg)}
+.sign h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
+.sign h1 span{color:var(--parade)}
+.sign p{margin:0;color:var(--muted);max-width:60ch}
+.clock{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.clock .time{font-family:var(--mono);font-size:28px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1}
+.clock .day{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.clock button{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 12px;font-weight:600}
+.clock button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.scrub{width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.scrub input{width:100%;accent-color:var(--accent)}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+
+.mapbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;min-width:0}
+.mapbox svg{width:100%;height:auto;display:block;max-width:100%}
+.maphead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:4px 6px 8px;font-size:12px;color:var(--muted)}
+.maphead strong{font-family:var(--display);font-size:16px;text-transform:uppercase;letter-spacing:.04em;color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-left:auto}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:22px;height:0;border-top:4px solid}
+.sw.confirmed{border-color:var(--confirmed)}
+.sw.probable{border-color:var(--probable);border-top-style:dashed}
+.sw.rumored{border-color:var(--rumored);border-top-style:dotted}
+.sw.slow{border-color:var(--slow);border-top-width:2px}
+.sw.subway{border-color:#ee352e;border-top-width:3px}
+.sw.bus{border-color:var(--bus);border-top-width:3px;border-top-style:dashed}
+svg .stn{fill:var(--panel);stroke:var(--fg);stroke-width:1.6}
+svg .ln{font-size:10px;font-weight:700;letter-spacing:.03em}
+.turns .dir.ride{color:#fff;border-radius:3px;padding:0 4px;text-align:center}
+.sw.parade{border-color:var(--parade);border-top-width:8px;opacity:.5}
+.sw.route{border-color:var(--route)}
+.sw.baseline{border-color:var(--baseline);border-top-style:dashed}
+
+svg text{font-family:var(--body);fill:var(--label)}
+svg .ave{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+svg .st{font-size:11px}
+svg .node{fill:var(--panel);stroke:var(--road-edge);stroke-width:1.5;cursor:pointer}
+svg .node:hover{stroke:var(--accent);stroke-width:3}
+svg .hit{fill:transparent;cursor:pointer}
+svg .lm{font-size:11px}
+svg .pin text{font-family:var(--display);font-size:13px;font-weight:700;fill:#fff}
+@media (prefers-reduced-motion:no-preference){ svg .pulse{animation:pulse 1.2s ease-in-out infinite} }
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.card h2{font-family:var(--display);font-size:18px;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px;font-weight:700}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:grid;gap:3px;flex:1;min-width:0}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 8px;min-width:0}
+.swap{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 10px;align-self:end}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--bg);padding:6px 12px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.result{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.tile{background:var(--bg);border-radius:6px;padding:8px 10px}
+.tile .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tile .v{font-family:var(--mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile .v small{font-size:12px;color:var(--muted)}
+.tile.route .v{color:var(--route)}
+.delta{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.delta b{color:var(--fg)}
+.turns{margin:8px 0 0;padding:0;list-style:none;font-size:13px;display:grid;gap:3px}
+.turns li{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:baseline}
+.turns .dir{font-family:var(--mono);color:var(--accent);font-size:12px}
+.turns .m{font-family:var(--mono);color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.blocked{color:var(--confirmed);font-weight:600}
+
+.counts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:var(--chip)}
+.pill i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pill.confirmed i{background:var(--confirmed)}.pill.probable i{background:var(--probable)}.pill.rumored i{background:var(--rumored)}
+
+.feed{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:460px;overflow:auto}
+.ev{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer;text-align:left;width:100%}
+.ev:hover,.ev.on{border-color:var(--accent)}
+.ev .t{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ev .h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:0}
+.ev .src{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;padding:1px 6px;border-radius:4px;color:#fff}
+.src.official{background:#1d3f8a}.src.c311{background:#3b7f5c}.src.waze{background:#5a6f8a}.src.social{background:#8a5a9a}
+.ev .who{font-size:12px;color:var(--muted)}
+.ev .txt{grid-column:2;font-size:13px}
+.ev .fx{grid-column:2;font-size:11px;color:var(--muted)}
+.ev .fx b{font-weight:600}
+.fx .lv-confirmed{color:var(--confirmed)}.fx .lv-probable{color:var(--probable)}.fx .lv-rumored{color:var(--rumored)}.fx .lv-slow{color:var(--slow)}
+.empty{color:var(--muted);font-size:13px;padding:10px 4px}
+
+.how{font-size:12.5px;color:var(--muted);max-width:72ch}
+.how code{font-family:var(--mono);font-size:12px;background:var(--chip);padding:0 4px;border-radius:3px;color:var(--fg)}
+.how p{margin:0 0 6px}
+</style>
+
+<div class="wrap">
+  <header class="sign">
+    <div>
+      <h1>Madison Square Garden <span>Route Finder</span></h1>
+      <p>Championship-night closures around the Garden, fused from official advisories, 311 and Waze reports, and social posts, scored for confidence and routed around. Schematic Midtown.</p>
+    </div>
+    <div class="clock">
+      <div><div class="day">Game 7 night · simulated</div><div class="time" id="clock">22:30</div></div>
+      <button id="play" aria-pressed="false">Play</button>
+      <button id="reset">Reset</button>
+    </div>
+    <div class="scrub"><span>17:00</span><input type="range" id="scrub" min="1020" max="1620" step="1" value="1350" aria-label="Simulated time"><span>03:00</span></div>
+  </header>
+
+  <div class="main">
+    <section class="mapbox" aria-label="Schematic map">
+      <div class="maphead">
+        <strong>Midtown West · schematic grid</strong>
+        <span>Click two intersections to set start and home.</span>
+        <div class="legend">
+          <span><i class="sw parade"></i>Garden perimeter</span>
+          <span><i class="sw confirmed"></i>Confirmed</span>
+          <span><i class="sw probable"></i>Probable</span>
+          <span><i class="sw rumored"></i>Rumored</span>
+          <span><i class="sw slow"></i>Slow</span>
+          <span><i class="sw subway"></i>Subway</span>
+          <span><i class="sw bus"></i>Bus</span>
+          <span><i class="sw route"></i>Route</span>
+          <span><i class="sw baseline"></i>No-closure route</span>
+        </div>
+      </div>
+      <svg id="map" viewBox="0 0 920 680" role="img" aria-label="Schematic street grid around Madison Square Garden with closures and route"></svg>
+    </section>
+
+    <aside class="panel">
+      <div class="card">
+        <h2>Route home</h2>
+        <div class="row">
+          <div class="field"><label for="from">Start</label><select id="from"></select></div>
+          <button class="swap" id="swap" title="Swap">⇅</button>
+          <div class="field"><label for="to">Home</label><select id="to"></select></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="seg" role="group" aria-label="Mode">
+            <button id="m-walk" aria-pressed="true">Walk</button>
+            <button id="m-drive" aria-pressed="false">Drive</button>
+            <button id="m-transit" aria-pressed="false">Transit</button>
+          </div>
+          <label class="check"><input type="checkbox" id="avoidProb" checked> Treat probable as closed</label>
+        </div>
+        <div class="result" id="result"></div>
+        <ol class="turns" id="turns"></ol>
+      </div>
+
+      <div class="card">
+        <h2>Closure feed</h2>
+        <div class="counts" id="counts"></div>
+        <ul class="feed" id="feed"></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+// ---------- Grid ----------
+const STREETS=['42nd St','40th St','38th St','36th St','34th St','33rd St','32nd St','31st St','30th St','28th St'];
+const STNUM=[42,40,38,36,34,33,32,31,30,28];
+const AVES=['10th Ave','9th Ave','8th Ave','7th Ave','6th Ave','5th Ave','Madison Ave','Park Ave'];
+const R=STREETS.length, C=AVES.length;
+const YS=[62,132,202,272,342,392,442,492,542,612];
+const X=c=>86+c*106, Y=r=>YS[r];
+const LEN={h:260,v:80};           // metres: avenue-to-avenue, and per street number
+const SPEED={walk:80,drive:230};  // metres per minute
+const REMOVED=new Set(['h:6:2']); // 32nd St does not run through the MSG / Penn Station block
+const nid=(r,c)=>r+':'+c;
+const nodeName=(r,c)=>STREETS[r]+' & '+AVES[c];
+const edges=[];
+for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+  if(c<C-1&&!REMOVED.has(`h:${r}:${c}`))edges.push({key:`h:${r}:${c}`,a:nid(r,c),b:nid(r,c+1),len:LEN.h,street:STREETS[r],r,c,dir:'h'});
+  if(r<R-1&&!REMOVED.has(`v:${r}:${c}`))edges.push({key:`v:${r}:${c}`,a:nid(r,c),b:nid(r+1,c),len:LEN.v*(STNUM[r]-STNUM[r+1]),street:AVES[c],r,c,dir:'v'});
+}
+const edgeByKey=Object.fromEntries(edges.map(e=>[e.key,e]));
+// ---------- Transit ----------
+const LINES={
+  '123':{color:'#ee352e',label:'1·2·3',path:['0:3','4:3','9:3'],stations:['0:3','4:3','9:3'],dx:9},
+  'ACE':{color:'#0039a6',label:'A·C·E',path:['0:2','4:2'],stations:['0:2','4:2'],dx:9,stubs:true},
+  'BDFM':{color:'#ff6319',label:'B·D·F·M',path:['0:4','4:4'],stations:['0:4','4:4'],dx:9,stubs:true},
+  'NQRW':{color:'#fccc0a',label:'N·Q·R·W',path:['0:3','4:4','9:4'],stations:['0:3','4:4','9:4'],dx:0},
+  '7':{color:'#b933ad',label:'7',path:['4:0','0:0','0:3','0:4','0:5','0:7'],stations:['4:0','0:3','0:4','0:5','0:7'],dy:9},
+  '456':{color:'#00933c',label:'4·5·6 (Lex)',path:['0:7','5:7','9:7'],stations:['0:7','5:7','9:7'],dx:9},
+};
+const STN={'0:3':'Times Sq–42nd St','0:2':'42nd St–Port Authority','0:4':'42nd St–Bryant Park','0:5':'5th Ave','0:7':'Grand Central–42nd St','4:0':'34th St–Hudson Yards','4:2':'34th St–Penn Station','4:3':'34th St–Penn Station','4:4':'34th St–Herald Sq','5:7':'33rd St','9:3':'28th St','9:4':'28th St','9:7':'28th St'};
+const BUSES={
+  'M34 SBS':{path:Array.from({length:C},(_,c)=>'4:'+c),dy:-7},
+  'M20':{path:Array.from({length:R},(_,r)=>r+':2'),dx:-7},
+  'M7':{path:Array.from({length:R},(_,r)=>r+':4'),dx:-7},
+  'M4':{path:Array.from({length:R},(_,r)=>r+':5'),dx:-7},
+};
+const SUB_SPEED=600, BUS_SPEED=200;
+const dist2=(a,b)=>{const[r1,c1]=a.split(':').map(Number),[r2,c2]=b.split(':').map(Number);return Math.abs(c1-c2)*LEN.h+Math.abs(STNUM[r1]-STNUM[r2])*LEN.v;};
+const tedges=[];
+for(const [id,L] of Object.entries(LINES)){
+  for(const n of L.stations)tedges.push({key:`a:${id}:${n}`,a:n,b:`${n}@${id}`,type:'access',line:id,len:0,street:L.label});
+  for(let i=0;i<L.stations.length-1;i++){const a=L.stations[i],b=L.stations[i+1];tedges.push({key:`s:${id}:${a}:${b}`,a:`${a}@${id}`,b:`${b}@${id}`,type:'ride',line:id,len:dist2(a,b),street:L.label,na:a,nb:b});}
+}
+for(const [id,B] of Object.entries(BUSES)){
+  for(const n of B.path)tedges.push({key:`ba:${id}:${n}`,a:n,b:`${n}@${id}`,type:'baccess',line:id,len:0,street:id});
+  for(let i=0;i<B.path.length-1;i++){const a=B.path[i],b=B.path[i+1];const road=edges.find(e=>(e.a===a&&e.b===b)||(e.a===b&&e.b===a));if(!road)continue;
+    tedges.push({key:`b:${id}:${road.key}`,a:`${a}@${id}`,b:`${b}@${id}`,type:'bride',line:id,len:road.len,road:road.key,street:id,na:a,nb:b});}
+}
+const allEdges=[...edges,...tedges];
+const adj={};
+for(const e of allEdges){(adj[e.a]??=[]).push(e);(adj[e.b]??=[]).push(e);}
+const streetNode=n=>n.split('@')[0];
+
+// segs(street, from, to) -> set of edge keys along `street` between cross streets `from` and `to`
+function segs(street,from,to){
+  const out=[];
+  const ai=AVES.indexOf(street), si=STREETS.indexOf(street);
+  if(ai>=0){ let r1=STREETS.indexOf(from), r2=STREETS.indexOf(to); if(r1>r2)[r1,r2]=[r2,r1]; for(let r=r1;r<r2;r++)out.push(`v:${r}:${ai}`); }
+  else if(si>=0){ let c1=AVES.indexOf(from), c2=AVES.indexOf(to); if(c1>c2)[c1,c2]=[c2,c1]; for(let c=c1;c<c2;c++)out.push(`h:${si}:${c}`); }
+  return out;
+}
+// crossStreets(ave1, ave2, street1, street2): all horizontal segments between two avenues across a range of streets
+function cross(a1,a2,s1,s2){
+  const out=[]; let r1=STREETS.indexOf(s1),r2=STREETS.indexOf(s2); if(r1>r2)[r1,r2]=[r2,r1];
+  for(let r=r1;r<=r2;r++)out.push(...segs(STREETS[r],a1,a2)); return out;
+}
+const hm=s=>{const[h,m]=s.split(':').map(Number);const v=h*60+m;return v<600?v+1440:v;}; // after-midnight times roll into the same night
+const fmt=t=>{t=t%1440;return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');};
+
+// ---------- Mock feed ----------
+const W={official:1.0,c311:0.6,waze:0.55,social:0.3};
+const HALF={official:Infinity,c311:180,waze:180,social:90};
+const SRC={official:'Official',c311:'311',waze:'Waze',social:'Social'};
+const EV=[
+ {t:'17:00',src:'official',who:'NYPD',kind:'close',from:'17:00',until:'02:00',
+  segs:[...segs('33rd St','8th Ave','7th Ave'),...segs('31st St','8th Ave','7th Ave')],
+  text:'Game 7 at Madison Square Garden tonight. 33rd St and 31st St closed between 7th Ave and 8th Ave from 5 PM. Expect closures to expand after the final buzzer.'},
+ {t:'17:10',src:'official',who:'Notify NYC',kind:'info',segs:[],
+  text:'Large crowds expected around Madison Square Garden and Herald Square this evening. Allow extra travel time and avoid driving in the area.'},
+ {t:'17:30',src:'official',who:'MTA',kind:'info',segs:[],
+  text:'Penn Station 7th Ave entrances will close after the game. Use 8th Ave / Moynihan Train Hall. 1/2/3 at 34th St will run with crowd control.'},
+ {t:'19:30',src:'official',who:'MTA Bus',kind:'close',from:'22:00',until:'02:00',
+  segs:['b:M34 SBS:h:4:1','b:M34 SBS:h:4:2','b:M34 SBS:h:4:3'],
+  text:'M34 SBS: from 10 PM, buses detour off 34th St between 9th Ave and 6th Ave. No stops at 8th Ave or 7th Ave.'},
+ {t:'18:30',src:'official',who:'NYC DOT advisory',kind:'close',from:'18:30',until:'02:00',
+  segs:segs('7th Ave','31st St','34th St'),
+  text:'7th Ave closed from 31st St to 34th St, 6:30 PM until 2 AM. Buses detoured to 6th Ave.'},
+ {t:'19:15',src:'c311',who:'311 report',kind:'slow',from:'19:15',until:'02:00',
+  segs:segs('8th Ave','31st St','34th St'),
+  text:'Barricades on 8th Ave at 33rd St have traffic down to one lane. Cabs backed up to 30th.'},
+ {t:'20:40',src:'waze',who:'Waze user report',kind:'close',from:'20:40',until:'02:00',
+  segs:segs('32nd St','6th Ave','5th Ave'),
+  text:'Road closed: 32nd St at 6th Ave. Pedestrians in roadway.'},
+ {t:'21:30',src:'social',who:'@ktown_eats',kind:'close',from:'21:30',until:'02:00',
+  segs:segs('32nd St','6th Ave','5th Ave'),
+  text:'32nd st k-town is absolutely packed, every bar has a screen outside, cannot move'},
+ {t:'22:05',src:'social',who:'@knicks_nation',kind:'close',from:'22:05',until:'02:00',
+  segs:segs('33rd St','9th Ave','8th Ave'),
+  text:'FINAL BUZZER!!! streets outside the garden going crazy, 33rd is a mosh pit all the way to 9th'},
+ {t:'22:10',src:'official',who:'NYPD',kind:'close',from:'22:10',until:'02:00',
+  segs:[...segs('8th Ave','31st St','36th St'),...segs('34th St','9th Ave','6th Ave'),...segs('33rd St','9th Ave','6th Ave')],
+  text:'Knicks win. 8th Ave closed 31st St to 36th St; 34th St and 33rd St closed 9th Ave to 6th Ave until further notice. Garden perimeter frozen.'},
+ {t:'22:15',src:'official',who:'MTA Subway',kind:'close',from:'22:15',until:'00:30',
+  segs:['a:123:4:3','a:ACE:4:2'],
+  text:'Due to crowd conditions, 1/2/3 and A/C/E trains are bypassing 34th St–Penn Station in both directions. Use 42nd St or 28th St.'},
+ {t:'22:20',src:'c311',who:'311 report',kind:'close',from:'22:20',until:'02:00',
+  segs:segs('6th Ave','33rd St','36th St'),
+  text:'Crowd has taken over 6th Ave at Herald Square. Cars stuck between 34th and 35th.'},
+ {t:'22:35',src:'social',who:'@heraldsq_hannah',kind:'close',from:'22:35',until:'02:00',
+  segs:segs('6th Ave','34th St','36th St'),
+  text:'herald square is a sea of orange, 6th ave totally shut by people'},
+ {t:'22:40',src:'social',who:'@heraldsq_hannah',kind:'close',from:'22:40',until:'02:00',
+  segs:['a:BDFM:4:4','a:NQRW:4:4'],
+  text:'herald sq station is a mob scene, they just closed the stairs on the 34th st side'},
+ {t:'22:50',src:'waze',who:'Waze user report',kind:'close',from:'22:50',until:'02:00',
+  segs:segs('34th St','6th Ave','5th Ave'),
+  text:'Road closed: 34th St between 6th Ave and 5th Ave.'},
+ {t:'23:00',src:'official',who:'NYC DOT update',kind:'close',from:'23:00',until:'02:00',
+  segs:[...segs('6th Ave','32nd St','36th St'),...segs('34th St','6th Ave','5th Ave')],
+  text:'Added closures until 2 AM: 6th Ave from 32nd St to 36th St; 34th St extended east to 5th Ave.'},
+ {t:'23:05',src:'official',who:'MTA Subway',kind:'close',from:'23:05',until:'00:45',
+  segs:['a:BDFM:4:4','a:NQRW:4:4'],
+  text:'B/D/F/M and N/Q/R/W trains are bypassing 34th St–Herald Sq in both directions due to crowd conditions.'},
+ {t:'23:15',src:'social',who:'@bus_to_jersey',kind:'close',from:'23:15',until:'01:00',
+  segs:segs('42nd St','9th Ave','7th Ave'),
+  text:'hearing they are shutting 42nd st at port authority because of the crowd?? anyone know'},
+ {t:'23:30',src:'official',who:'NYPD',kind:'open',from:'23:30',until:'04:00',
+  segs:segs('42nd St','9th Ave','7th Ave'),
+  text:'42nd St remains open. Port Authority Bus Terminal is operating normally. Disregard unofficial reports.'},
+ {t:'23:35',src:'official',who:'MTA Bus',kind:'close',from:'23:35',until:'01:30',
+  segs:['b:M7:v:6:4','b:M7:v:5:4','b:M7:v:4:4','b:M7:v:3:4','b:M20:v:7:2','b:M20:v:6:2','b:M20:v:5:2','b:M20:v:4:2','b:M20:v:3:2'],
+  text:'M7 and M20: detoured around Herald Square and the Garden. M7 skips 6th Ave stops 32nd to 36th; M20 skips 8th Ave stops 31st to 36th.'},
+ {t:'23:40',src:'waze',who:'Waze traffic',kind:'slow',from:'23:40',until:'02:30',
+  segs:segs('9th Ave','30th St','38th St'),
+  text:'Heavy traffic on 9th Ave southbound, 30th to 38th. Average speed 3 mph.'},
+ {t:'00:15',src:'c311',who:'311 report',kind:'close',from:'00:15',until:'02:00',
+  segs:segs('5th Ave','33rd St','36th St'),
+  text:'Crowd spilling onto 5th Ave below the Empire State Building. Roadway blocked both directions.'},
+ {t:'00:30',src:'official',who:'MTA Subway',kind:'open',from:'00:30',until:'04:00',
+  segs:['a:123:4:3','a:ACE:4:2'],
+  text:'1/2/3 and A/C/E trains are again stopping at 34th St–Penn Station. Expect crowded platforms.'},
+ {t:'00:45',src:'official',who:'MTA Subway',kind:'open',from:'00:45',until:'04:00',
+  segs:['a:BDFM:4:4','a:NQRW:4:4'],
+  text:'Service has resumed at 34th St–Herald Sq on the B/D/F/M and N/Q/R/W.'},
+ {t:'01:00',src:'official',who:'NYPD',kind:'open',from:'01:00',until:'04:00',
+  segs:[...segs('6th Ave','32nd St','36th St'),...segs('34th St','6th Ave','5th Ave'),...segs('5th Ave','33rd St','36th St')],
+  text:'Reopening 6th Ave 32nd to 36th, 34th St east of 6th Ave, and 5th Ave. Garden perimeter closures remain in effect.'},
+ {t:'01:45',src:'official',who:'NYPD',kind:'open',from:'01:45',until:'04:00',
+  segs:[...segs('7th Ave','31st St','34th St'),...segs('8th Ave','31st St','36th St'),...segs('34th St','9th Ave','6th Ave')],
+  text:'7th Ave, 8th Ave and 34th St reopened. 33rd St and 31st St between 7th and 8th remain closed for cleanup until 4 AM.'},
+ {t:'01:50',src:'official',who:'MTA Bus',kind:'open',from:'01:50',until:'04:00',
+  segs:['b:M34 SBS:h:4:1','b:M34 SBS:h:4:2','b:M34 SBS:h:4:3','b:M7:v:6:4','b:M7:v:5:4','b:M7:v:4:4','b:M7:v:3:4','b:M20:v:7:2','b:M20:v:6:2','b:M20:v:5:2','b:M20:v:4:2','b:M20:v:3:2'],
+  text:'M34 SBS, M7 and M20 have resumed regular routes.'},
+ {t:'02:10',src:'social',who:'@ktown_eats',kind:'open',from:'02:10',until:'04:00',
+  segs:segs('32nd St','6th Ave','5th Ave'),
+  text:'32nd is clearing out, cabs are back'},
+].map((e,i)=>({...e,id:i,tm:hm(e.t),fromM:e.from?hm(e.from):hm(e.t),untilM:e.until?hm(e.until):Infinity,set:new Set(e.segs)}));
+
+// ---------- Scoring ----------
+function segState(key,t){
+  let prodNo=1,openF=1,slow=false,lastOffClose=-1,lastOffOpen=-1;
+  for(const e of EV){
+    if(e.tm>t||!e.set.has(key))continue;
+    if(t<e.fromM||t>=e.untilM)continue;
+    if(e.kind==='slow'){slow=true;continue;}
+    const w=W[e.src]*Math.pow(0.5,(t-e.tm)/HALF[e.src]);
+    if(e.kind==='close'){prodNo*=(1-w);if(e.src==='official')lastOffClose=e.tm;}
+    else if(e.kind==='open'){if(e.src==='official')lastOffOpen=e.tm;else openF*=(1-w);}
+  }
+  let p=(1-prodNo)*openF;
+  if(lastOffOpen>=lastOffClose&&lastOffOpen>=0)p=0;
+  const level=p>=.8?'confirmed':p>=.45?'probable':p>=.15?'rumored':null;
+  return {p,level,slow};
+}
+function allStates(t){const o={};for(const e of allEdges)o[e.key]=segState(e.key,t);return o;}
+
+// ---------- Routing ----------
+function blocked(st,avoidProb){return st.level==='confirmed'||(st.level==='probable'&&avoidProb);}
+function roadMult(st,avoidProb){
+  if(blocked(st,avoidProb))return Infinity; let m=1;
+  if(st.level==='probable')m*=1+6*st.p; else if(st.level==='rumored')m*=1+2*st.p;
+  if(st.slow)m*=2; return m;
+}
+function cost(e,u,states,mode,avoidProb,baseline){
+  const st=states[e.key];
+  if(e.type==='access'||e.type==='baccess'){
+    if(mode!=='transit')return Infinity;
+    if(!baseline&&blocked(st,avoidProb))return Infinity;
+    const entering=u===e.a; return e.type==='access'?(entering?4:1.5):(entering?6:0.5);
+  }
+  if(e.type==='ride'){ if(mode!=='transit')return Infinity; if(!baseline&&blocked(st,avoidProb))return Infinity; return e.len/SUB_SPEED+0.5; }
+  if(e.type==='bride'){ if(mode!=='transit')return Infinity; const m=baseline?1:roadMult(states[e.road],avoidProb); if(!isFinite(m)||(!baseline&&blocked(st,avoidProb)))return Infinity; return e.len/BUS_SPEED*m+0.5; }
+  const m=baseline?1:roadMult(st,avoidProb); if(!isFinite(m))return Infinity;
+  return e.len/SPEED[mode==='transit'?'walk':mode]*m;
+}
+function dijkstra(src,dst,states,mode,avoidProb,baseline){
+  const dist={[src]:0},prev={},done=new Set();
+  const pq=[[0,src]];
+  while(pq.length){
+    pq.sort((a,b)=>a[0]-b[0]); const [d,u]=pq.shift();
+    if(done.has(u))continue; done.add(u); if(u===dst)break;
+    for(const e of adj[u]||[]){
+      const v=e.a===u?e.b:e.a; const c=cost(e,u,states,mode,avoidProb,baseline);
+      if(!isFinite(c))continue;
+      if(dist[v]===undefined||d+c<dist[v]){dist[v]=d+c;prev[v]=e;pq.push([d+c,v]);}
+    }
+  }
+  if(dist[dst]===undefined)return null;
+  const path=[];let u=dst;while(u!==src){const e=prev[u];path.unshift(e);u=e.a===u?e.b:e.a;}
+  return {min:dist[dst],path,metres:path.filter(e=>!e.type).reduce((s,e)=>s+e.len,0)};
+}
+
+// ---------- State ----------
+let t=1350, playing=false, mode='walk', from='5:6', to='5:1', hl=null, picking=0;
+const $=id=>document.getElementById(id);
+
+// ---------- Static map ----------
+const svg=$('map');
+function buildStatic(){
+  let s='';
+  s+=`<rect x="0" y="0" width="920" height="680" fill="var(--panel)"/>`;
+  s+=`<rect x="0" y="0" width="40" height="680" fill="var(--water)"/><text x="20" y="340" class="ave" text-anchor="middle" transform="rotate(-90 20 340)">Hudson River</text>`;
+  // landmarks
+  const blk=(c1,c2,r1,r2,l1,l2,fill)=>`<rect x="${X(c1)+6}" y="${Y(r1)+6}" width="${X(c2)-X(c1)-12}" height="${Y(r2)-Y(r1)-12}" rx="6" fill="${fill}"/><text x="${(X(c1)+X(c2))/2}" y="${(Y(r1)+Y(r2))/2-2}" class="st" text-anchor="middle">${l1}</text><text x="${(X(c1)+X(c2))/2}" y="${(Y(r1)+Y(r2))/2+12}" class="st" text-anchor="middle">${l2}</text>`;
+  s+=blk(4,5,0,1,'Bryant','Park','var(--park)');
+  s+=blk(2,3,5,7,'Madison Sq','Garden','var(--parade)').replace('rx="6"','rx="40" opacity=".35"');
+  s+=`<text x="${(X(2)+X(3))/2}" y="${Y(7)-10}" class="st" text-anchor="middle">Penn Station</text>`;
+  s+=`<text x="${X(5)+8}" y="${Y(4)-10}" class="st">Empire State</text>`;
+  s+=`<text x="${X(4)+8}" y="${Y(4)-10}" class="st">Herald Sq</text>`;
+  s+=`<text x="${X(2)+8}" y="${Y(0)+16}" class="st">Port Authority</text>`;
+  // garden perimeter band
+  s+=`<rect x="${X(2)-10}" y="${Y(5)-10}" width="${X(3)-X(2)+20}" height="${Y(7)-Y(5)+20}" rx="18" fill="none" stroke="var(--parade)" stroke-width="12" opacity=".32"/>`;
+  // roads
+  for(const e of edges){const[a,b]=[pt(e.a),pt(e.b)];s+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--road-edge)" stroke-width="7"/>`;}
+  for(const e of edges){const[a,b]=[pt(e.a),pt(e.b)];s+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--road)" stroke-width="4"/>`;}
+  // bus routes
+  for(const [id,B] of Object.entries(BUSES)){const dx=B.dx||0,dy=B.dy||0;const pts=B.path.map(n=>{const p=pt(n);return (p.x+dx)+','+(p.y+dy);}).join(' ');
+    s+=`<polyline points="${pts}" fill="none" stroke="var(--bus)" stroke-width="2.5" stroke-dasharray="6 4" opacity=".85"><title>${id}</title></polyline>`;
+    const last=pt(B.path[B.path.length-1]);s+=`<text x="${last.x+dx+(B.dy?6:-4)}" y="${last.y+dy+(B.dy?4:14)}" class="ln" text-anchor="${B.dy?'start':'end'}" style="fill:var(--bus)">${id}</text>`;}
+  // subway lines
+  for(const [id,L] of Object.entries(LINES)){const dx=L.dx||0,dy=L.dy||0;const pts=L.path.map(n=>{const p=pt(n);return [p.x+dx,p.y+dy];});
+    let pl=pts.map(p=>p.join(',')).join(' ');
+    if(L.stubs){const a=pts[pts.length-1];pl+=` ${a[0]},${a[1]+40}`;}
+    s+=`<polyline points="${pl}" fill="none" stroke="${L.color}" stroke-width="4" stroke-linejoin="round" ${L.stubs?'stroke-dasharray="0" ':''}><title>${L.label}</title></polyline>`;
+    const e=pts[pts.length-1];s+=`<text x="${e[0]+(L.dy?6:5)}" y="${e[1]+(L.stubs?52:16)}" class="ln" style="fill:${L.color}">${L.label}</text>`;}
+  // stations
+  const seenS=new Set();
+  for(const [id,L] of Object.entries(LINES))for(const n of L.stations){const p=pt(n);const dx=L.dx||0,dy=L.dy||0;const k=n+dx+dy;if(seenS.has(k))continue;seenS.add(k);
+    s+=`<circle class="stn" cx="${p.x+dx}" cy="${p.y+dy}" r="4"><title>${STN[n]} (${L.label})</title></circle>`;}
+  // labels
+  for(let c=0;c<C;c++)s+=`<text x="${X(c)}" y="38" class="ave" text-anchor="middle">${AVES[c]}</text>`;
+  for(let r=0;r<R;r++)s+=`<text x="${X(0)-14}" y="${Y(r)+4}" class="st" text-anchor="end">${STREETS[r]}</text>`;
+  s+=`<text x="460" y="${Y(9)+40}" class="st" text-anchor="middle">Schematic: two-street gaps above 34th and below 30th are drawn as single blocks.</text>`;
+  s+=`<g id="dyn"></g><g id="nodes">`;
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)s+=`<circle class="node" data-n="${nid(r,c)}" cx="${X(c)}" cy="${Y(r)}" r="5"><title>${nodeName(r,c)}</title></circle><circle class="hit" data-n="${nid(r,c)}" cx="${X(c)}" cy="${Y(r)}" r="14"/>`;
+  s+=`</g><g id="pins"></g>`;
+  svg.innerHTML=s;
+}
+function pt(n){const[r,c]=n.split(':').map(Number);return {x:X(c),y:Y(r)};}
+
+// ---------- Render ----------
+function render(){
+  $('clock').textContent=fmt(t); $('scrub').value=t;
+  const states=allStates(t);
+  const avoid=$('avoidProb').checked;
+  const route=dijkstra(from,to,states,mode,avoid,false);
+  const base=dijkstra(from,to,states,mode,avoid,true);
+
+  // dynamic layer
+  let d='';
+  const dash={confirmed:'',probable:'10 7',rumored:'3 6'};
+  for(const e of edges){
+    const st=states[e.key]; const[a,b]=[pt(e.a),pt(e.b)];
+    if(st.slow&&!st.level)d+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--slow)" stroke-width="3" stroke-dasharray="2 5"/>`;
+    if(st.level){d+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--${st.level})" stroke-width="${st.level==='confirmed'?7:5}" stroke-dasharray="${dash[st.level]}" stroke-linecap="round"><title>${e.street}: ${st.level} (${st.p.toFixed(2)})</title></line>`;}
+    if(hl&&hl.set.has(e.key))d+=`<line class="pulse" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--accent)" stroke-width="14" stroke-linecap="round" opacity=".6"/>`;
+  }
+  const drawRoute=(r,isBase)=>{if(!r)return'';let u=from,o='';
+    for(const e of r.path){const v=e.a===u?e.b:e.a;const a=pt(streetNode(u)),b=pt(streetNode(v));u=v;if(e.type==='access'||e.type==='baccess')continue;
+      if(isBase)o+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--baseline)" stroke-width="5" stroke-dasharray="8 6" stroke-linecap="round"/>`;
+      else if(e.type==='ride'){o+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--panel)" stroke-width="11" stroke-linecap="round"/><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${LINES[e.line].color}" stroke-width="7" stroke-linecap="round"/>`;}
+      else if(e.type==='bride'){o+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--panel)" stroke-width="11" stroke-linecap="round"/><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--bus)" stroke-width="7" stroke-dasharray="8 5" stroke-linecap="round"/>`;}
+      else o+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--route)" stroke-width="6" stroke-linecap="round"/>`;}
+    return o;};
+  d+=drawRoute(base,true)+drawRoute(route,false);
+  $('dyn').innerHTML=d;
+  const pin=(n,l)=>{const p=pt(n);return `<g class="pin"><circle cx="${p.x}" cy="${p.y}" r="12" fill="var(--route)" stroke="var(--panel)" stroke-width="2"/><text x="${p.x}" y="${p.y+4.5}" text-anchor="middle">${l}</text></g>`;};
+  $('pins').innerHTML=pin(from,'S')+pin(to,'H');
+
+  // result card
+  const rs=$('result');
+  if(!route){rs.innerHTML=`<div class="tile route" style="grid-column:1/-1"><div class="k">With closures</div><div class="v blocked">No route</div><div class="delta">Every path is cut by confirmed${avoid?' or probable':''} closures right now. Try later, or allow probable segments.</div></div>`;$('turns').innerHTML='';}
+  else{
+    const dm=route.min-base.min;
+    rs.innerHTML=`<div class="tile route"><div class="k">With closures</div><div class="v">${Math.round(route.min)}<small> min</small></div><div class="k">${(route.metres/1000).toFixed(1)} km</div></div>
+    <div class="tile"><div class="k">If nothing were closed</div><div class="v">${Math.round(base.min)}<small> min</small></div><div class="k">${(base.metres/1000).toFixed(1)} km</div></div>
+    <div class="delta">${dm<0.5?'Closures are not adding time to this trip.':`Detour adds <b>+${Math.round(dm)} min</b> and ${(Math.max(0,route.metres-base.metres)/1000).toFixed(1)} km.`}</div>`;
+    // turns
+    const legs=[];let u=from;
+    for(const e of route.path){const v=e.a===u?e.b:e.a;
+      if(e.type==='access'||e.type==='baccess'){u=v;continue;}
+      if(e.type==='ride'||e.type==='bride'){const last=legs[legs.length-1];const dest=streetNode(v);
+        if(last&&last.type===e.type&&last.street===e.street){last.stops++;last.end=dest;}else legs.push({type:e.type,street:e.street,line:e.line,stops:1,end:dest,start:streetNode(u)});u=v;continue;}
+      const [ru,cu]=u.split(':').map(Number),[rv,cv]=v.split(':').map(Number);
+      const dir=e.dir==='v'?(rv>ru?'S':'N'):(cv>cu?'E':'W');
+      const last=legs[legs.length-1];if(last&&!last.type&&last.street===e.street&&last.dir===dir){last.m+=e.len;last.end=v;}else legs.push({street:e.street,dir,m:e.len,end:v});u=v;}
+    $('turns').innerHTML=legs.map(l=>{const[r,c]=l.end.split(':').map(Number);
+      if(l.type==='ride')return `<li><span class="dir ride" style="background:${LINES[l.line].color}">${l.line.length>2?l.line[0]:l.line}</span><span>Take ${l.street} to ${STN[l.end]}</span><span class="m">${l.stops} stop${l.stops>1?'s':''}</span></li>`;
+      if(l.type==='bride')return `<li><span class="dir ride" style="background:var(--bus)">B</span><span>${l.street} bus to ${nodeName(r,c)}</span><span class="m">${l.stops} stop${l.stops>1?'s':''}</span></li>`;
+      const crossn=AVES.includes(l.street)?STREETS[r]:AVES[c];return `<li><span class="dir">${l.dir}</span><span>${l.street} to ${crossn}</span><span class="m">${l.m} m</span></li>`;}).join('');
+  }
+
+  // counts
+  const cnt={confirmed:0,probable:0,rumored:0};for(const k in states)if(states[k].level)cnt[states[k].level]++;
+  $('counts').innerHTML=['confirmed','probable','rumored'].map(l=>`<span class="pill ${l}"><i></i>${cnt[l]} ${l}</span>`).join('');
+
+  // feed
+  const seen=EV.filter(e=>e.tm<=t).sort((a,b)=>b.tm-a.tm);
+  $('feed').innerHTML=seen.length?seen.map(e=>{
+    let fx='';
+    if(e.kind==='info')fx='Advisory only, no segments affected.';
+    else{
+      const lv={};for(const k of e.set){const s=states[k];const l=s.level||(s.slow&&e.kind==='slow'?'slow':null);if(l)lv[l]=(lv[l]||0)+1;}
+      const parts=Object.entries(lv).map(([l,n])=>`<b class="lv-${l}">${n} ${l}</b>`);
+      const act=t>=e.fromM&&t<e.untilM;
+      const isT=[...e.set].some(k=>/^(a|b|s|ba):/.test(k));fx=(e.kind==='open'?'Reports open: ':e.kind==='slow'?'Slowdown: ':'Reports closed: ')+e.set.size+(isT?' transit link':' segment')+(e.set.size>1?'s':'')+(e.from&&e.fromM>e.tm?` from ${e.from}`:'')+(e.until?` until ${e.until}`:'')+'. '+(act?(parts.length?'Now '+parts.join(', ')+'.':'Now below threshold.'):'Not in effect at this time.');
+    }
+    return `<li><button class="ev ${hl&&hl.id===e.id?'on':''}" data-id="${e.id}"><span class="t">${e.t}</span><span class="h"><span class="src ${e.src}">${SRC[e.src]}</span><span class="who">${e.who}</span></span><span class="txt">${e.text}</span><span class="fx">${fx}</span></button></li>`;
+  }).join(''):`<li class="empty">No reports yet. Press Play or drag the time slider.</li>`;
+}
+
+// ---------- Wiring ----------
+function fillSelects(){
+  const opts=[];for(let r=0;r<R;r++)for(let c=0;c<C;c++)opts.push(`<option value="${nid(r,c)}">${nodeName(r,c)}</option>`);
+  $('from').innerHTML=opts.join('');$('to').innerHTML=opts.join('');$('from').value=from;$('to').value=to;
+}
+buildStatic();fillSelects();render();
+$('from').onchange=e=>{from=e.target.value;render();};
+$('to').onchange=e=>{to=e.target.value;render();};
+$('swap').onclick=()=>{[from,to]=[to,from];$('from').value=from;$('to').value=to;render();};
+for(const m of ['walk','drive','transit'])$('m-'+m).onclick=()=>{mode=m;for(const k of ['walk','drive','transit'])$('m-'+k).setAttribute('aria-pressed',String(k===m));render();};
+$('avoidProb').onchange=render;
+$('scrub').oninput=e=>{t=+e.target.value;render();};
+svg.addEventListener('click',e=>{const n=e.target.closest('[data-n]');if(!n)return;const id=n.dataset.n;
+  if(picking===0){from=id;picking=1;}else{to=id;picking=0;}
+  $('from').value=from;$('to').value=to;render();});
+$('feed').addEventListener('click',e=>{const b=e.target.closest('.ev');if(!b)return;const id=+b.dataset.id;hl=hl&&hl.id===id?null:EV[id];render();});
+let timer=null;
+function setPlay(p){playing=p;$('play').textContent=p?'Pause':'Play';$('play').setAttribute('aria-pressed',String(p));
+  clearInterval(timer);if(p)timer=setInterval(()=>{t+=2;if(t>=1620){t=1620;setPlay(false);}render();},160);}
+$('play').onclick=()=>setPlay(!playing);
+$('reset').onclick=()=>{setPlay(false);t=1350;hl=null;render();};
+</script>
